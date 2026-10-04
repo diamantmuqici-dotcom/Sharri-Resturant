@@ -17,8 +17,7 @@ const cid=n=>db.prepare("SELECT id FROM categories WHERE name=?").get(n).id;
 const ps=[
 ["Pije","Kokakolla",100,"PIJE"],["Pije","Fanta",100,"PIJE"],["Pije","Birrë Pejë E vogël",100,"PIJE"],["Pije","Birrë Pejë E madhe",100,"PIJE"],["Pije","Schweppes",100,"PIJE"],["Pije","RedBull",150,"PIJE"],["Pije","Golden Eagle",100,"PIJE"],["Pije","Kafe",70,"KAFE"],["Pije","Çaj",70,"KAFE"],["Pije","Laqin",50,"PIJE"],
 ["Mish dhe Ushqim","File Pule",300,"USHQIM"],["Mish dhe Ushqim","Mish i Bardhë",350,"USHQIM"],["Mish dhe Ushqim","Pule",600,"USHQIM"],["Mish dhe Ushqim","Gjys Pule",300,"USHQIM"],["Mish dhe Ushqim","Kombinim Skare",400,"USHQIM"],["Mish dhe Ushqim","Mish Viqi Natyral",500,"USHQIM"],["Mish dhe Ushqim","Mish Viqi (1kg)",2500,"USHQIM"],["Mish dhe Ushqim","Pleskavicë Sharri",400,"USHQIM"],["Mish dhe Ushqim","Hamburger + Pomfrit",250,"USHQIM"],["Mish dhe Ushqim","Hamburger",250,"USHQIM"],["Mish dhe Ushqim","Pleskavicë",250,"USHQIM"],["Mish dhe Ushqim","Mish Pule",250,"USHQIM"],["Mish dhe Ushqim","Sandwich Proshut",200,"USHQIM"],["Mish dhe Ushqim","Sandwich Tuna",200,"USHQIM"],["Mish dhe Ushqim","Sandwich Mish Pule",250,"USHQIM"],["Mish dhe Ushqim","Sandwich Mish i Bardhë",250,"USHQIM"],
-["Ëmbëlsira","Trileqe",150,"EMBELSIRE"],["Ëmbëlsira","Torte Snikers",150,"EMBELSIRE"],["Ëmbëlsira","Laqko",150,"EMBELSIRE"],["Të tjera","Ice Smirnof",150,"TJETER"],["Të tjera","Henikeni",150,"TJETER"],["Të tjera","Bavaria",150,"TJETER"]];const ins=db.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)");
-const findProduct=db.prepare("SELECT id FROM products WHERE category_id=? AND name=? ORDER BY id LIMIT 1");
+["Ëmbëlsira","Trileqe",150,"EMBELSIRE"],["Ëmbëlsira","Torte Snikers",150,"EMBELSIRE"],["Ëmbëlsira","Laqko",150,"EMBELSIRE"],["Të tjera","Ice Smirnof",150,"TJETER"],["Të tjera","Henikeni",150,"TJETER"],["Të tjera","Bavaria",150,"TJETER"]];const findProduct=db.prepare("SELECT id FROM products WHERE category_id=? AND name=? ORDER BY id LIMIT 1");
 const deactivateDuplicates=db.prepare("UPDATE products SET active=0 WHERE category_id=? AND name=? AND id<>?");
 const insertProduct=db.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)");
 const sync= db.transaction(function(){
@@ -26,8 +25,7 @@ const sync= db.transaction(function(){
     const categoryId=cid(p[0]);
     const existing=findProduct.get(categoryId,p[1]);
     if(existing){
-      insertProduct; 
-      db.prepare("UPDATE products SET price_cents=?,kind=?,active=1,display_order=? WHERE id=?").run(p[2],p[3],i+1,existing.id);
+        db.prepare("UPDATE products SET price_cents=?,kind=?,active=1,display_order=? WHERE id=?").run(p[2],p[3],i+1,existing.id);
       deactivateDuplicates.run(categoryId,p[1],existing.id);
     }else{
       insertProduct.run(categoryId,p[1],p[2],p[3],i+1);
