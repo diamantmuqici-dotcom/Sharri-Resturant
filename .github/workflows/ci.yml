@@ -15,6 +15,8 @@ jobs:
       - run: node --check server.js
       - run: node --check db.js
       - name: Kontrollo JavaScript-in e frontendit
-        run: node -e "const fs=require('fs');const h=fs.readFileSync('public/index.html','utf8');const s=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)].map(x=>x[1]).join('\\n');new Function(s);console.log('Frontend JavaScript: OK')"
+        run: node --check public/app.js
+      - name: Kontrollo HTML-in
+        run: node -e "const fs=require('fs');const h=fs.readFileSync('public/index.html','utf8');if(!h.includes('<script src=\"/app.js\"></script>'))process.exit(1);console.log('HTML: OK')"
       - name: Kontrollo seed
         run: npm run seed
