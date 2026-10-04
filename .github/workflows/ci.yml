@@ -1,0 +1,20 @@
+name: Kontrolli i Sharri POS
+on:
+  push:
+  pull_request:
+jobs:
+  kontrollo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - run: node --check server.js
+      - run: node --check db.js
+      - name: Kontrollo JavaScript-in e frontendit
+        run: node -e "const fs=require('fs');const h=fs.readFileSync('public/index.html','utf8');const s=[...h.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)].map(x=>x[1]).join('\\n');new Function(s);console.log('Frontend JavaScript: OK')"
+      - name: Kontrollo seed
+        run: npm run seed
