@@ -11,20 +11,22 @@ const admin=process.env.ADMIN_USERNAME||"admin",pass=process.env.ADMIN_PASSWORD|
 db.prepare("INSERT OR IGNORE INTO users(username,password_hash,name,role) VALUES(?,?,?,?)").run(admin,bcrypt.hashSync(pass,12),"Administrator","ADMIN");
 db.prepare("INSERT OR IGNORE INTO users(username,password_hash,name,role) VALUES(?,?,?,?)").run("kamarieri",bcrypt.hashSync("kamarieri",12),"Kamarieri","KAMARIER");
 for(let i=1;i<=50;i++)db.prepare("INSERT OR IGNORE INTO tables_restaurant(id,number) VALUES(?,?)").run(i,i);
-const cats=[["Pije",1],["Mish dhe Ushqim",2],["Ëmbëlsira",3],["Të tjera",4]];
+const cats=[["Pije",1],["Mish dhe Ushqim",2],["Ëmbëlsira",3],["Menze",4],["Të tjera",5]];
 for(const c of cats)db.prepare("INSERT OR IGNORE INTO categories(name,display_order) VALUES(?,?)").run(...c);
 const cid=n=>db.prepare("SELECT id FROM categories WHERE name=?").get(n).id;
 const ps=[
 ["Pije","Kokakolla",100,"PIJE"],["Pije","Fanta",100,"PIJE"],["Pije","Birra Peje E vogel",100,"PIJE"],["Pije","Birra Peje E madhe",100,"PIJE"],["Pije","Schweeps",100,"PIJE"],["Pije","RedBull",150,"PIJE"],["Pije","Golden Eagle",100,"PIJE"],["Pije","Kafe",70,"KAFE"],["Pije","Qaj",70,"KAFE"],["Pije","Laqin",50,"PIJE"],["Pije","Laqko",150,"PIJE"],["Pije","Ice Smirnof",150,"PIJE"],["Pije","Henikeni",150,"PIJE"],["Pije","Bavaria",150,"PIJE"],
 ["Mish dhe Ushqim","File Pule",300,"USHQIM"],["Mish dhe Ushqim","Mish i Bardh",350,"USHQIM"],["Mish dhe Ushqim","Pule",600,"USHQIM"],["Mish dhe Ushqim","Gjys Pule",300,"USHQIM"],["Mish dhe Ushqim","Kombinim Skare",400,"USHQIM"],["Mish dhe Ushqim","Mish Viqi Natyral",500,"USHQIM"],["Mish dhe Ushqim","Mish Viqi (1kg)",2500,"USHQIM"],["Mish dhe Ushqim","Pleskavicë Sharri",400,"USHQIM"],["Mish dhe Ushqim","Hamburger + Pomfrit",250,"USHQIM"],["Mish dhe Ushqim","Sandwich Tuna",200,"USHQIM"],["Mish dhe Ushqim","Qebapa",50,"USHQIM"],["Mish dhe Ushqim","Pica Familjare",700,"USHQIM"],["Mish dhe Ushqim","Pica E madhe",400,"USHQIM"],["Mish dhe Ushqim","Pica E mesme",300,"USHQIM"],["Mish dhe Ushqim","Pica E vogel",300,"USHQIM"],
 ["Ëmbëlsira","Trileqe",150,"EMBELSIRE"],["Ëmbëlsira","Torte Snikers",150,"EMBELSIRE"]
-]const findProduct=db.prepare("SELECT id FROM products WHERE category_id=? AND name=? ORDER BY id LIMIT 1");
+,["Menze","Menze 5€",500,"USHQIM"],["Menze","Menze 10€",1000,"USHQIM"],["Menze","Menze 15€",1500,"USHQIM"],["Menze","Menze 20€",2000,"USHQIM"],["Menze","Menze 25€",2500,"USHQIM"],["Menze","Menze 50€",5000,"USHQIM"]
+];
+const findProduct=db.prepare("SELECT id FROM products WHERE category_id=? AND name=? ORDER BY id LIMIT 1");
 const deactivateDuplicates=db.prepare("UPDATE products SET active=0 WHERE category_id=? AND name=? AND id<>?");
 const deactivateMoved=db.prepare("UPDATE products SET active=0 WHERE name=? AND category_id<>?");
 const insertProduct=db.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)");
 const sync= db.transaction(function(){
   db.prepare("UPDATE products SET active=0").run();
-  db.prepare("UPDATE categories SET active=CASE WHEN name IN ('Pije','Mish dhe Ushqim','Ëmbëlsira') THEN 1 ELSE 0 END").run();
+  db.prepare("UPDATE categories SET active=CASE WHEN name IN ('Pije','Mish dhe Ushqim','Ëmbëlsira','Menze') THEN 1 ELSE 0 END").run();
   ps.forEach(function(p,i){
     const categoryId=cid(p[0]);
     deactivateMoved.run(p[1],categoryId);
