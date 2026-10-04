@@ -11,7 +11,7 @@ db.pragma("journal_mode=WAL");db.pragma("foreign_keys=ON");
 if(!db.prepare("PRAGMA table_info(orders)").all().some(x=>x.name==="unpaid_at"))db.exec("ALTER TABLE orders ADD COLUMN unpaid_at TEXT");
 const app=express();
 app.use(express.json({limit:"256kb"}));
-app.use(session({secret:process.env.SESSION_SECRET||"ndrysho-kete-sekret",resave:false,saveUninitialized:false,cookie:{httpOnly:true,sameSite:"lax",maxAge:43200000}}));
+app.use(session({secret:process.env.SESSION_SECRET||"ndrysho-kete-sekret",resave:false,saveUninitialized:false,cookie:{httpOnly:true,sameSite:"lax",secure:process.env.NODE_ENV==="production",maxAge:43200000}}));
 app.use(express.static(path.join(__dirname,"public")));
 const eur=c=>(Number(c)/100).toFixed(2)+"€";
 const auth=(req,res,next)=>req.session.user?next():res.status(401).json({error:"Duhet të kyçeni."});
@@ -22,6 +22,7 @@ function total(id){return db.prepare("SELECT COALESCE(SUM(quantity*unit_price_ce
 function items(id){return db.prepare("SELECT * FROM order_items WHERE order_id=? ORDER BY id").all(id)}
 function order(id){return db.prepare("SELECT o.*,t.number table_number,u.name waiter_name FROM orders o LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users u ON u.id=o.waiter_id WHERE o.id=?").get(id)}
 function food(k){return k==="USHQIM"||k==="EMBELSIRE"}
+app.get("/api/health",(q,r)=>r.json({ok:true,service:"sharri-pos"}));
 app.get("/api/sesioni",(q,r)=>q.session.user?r.json({loggedIn:true,user:q.session.user}):r.json({loggedIn:false}));
 app.post("/api/kycu",(q,r)=>{const u=db.prepare("SELECT * FROM users WHERE username=? AND active=1").get(String(q.body.username||""));if(!u||!bcrypt.compareSync(String(q.body.password||""),u.password_hash))return r.status(401).json({error:"Përdoruesi ose fjalëkalimi nuk është i saktë."});q.session.user={id:u.id,username:u.username,name:u.name,role:u.role};audit(u.id,"KYÇJE","USER",u.id);r.json({ok:true,user:q.session.user})});
 app.post("/api/dil",(q,r)=>q.session.destroy(()=>r.json({ok:true})));
@@ -53,4 +54,5 @@ app.get("/api/historiku/:id",admin,(q,r)=>{const o=order(q.params.id);if(!o)retu
 app.get("/api/statistika",admin,(q,r)=>{const t=db.prepare("SELECT COUNT(*) total,COALESCE(SUM(CASE WHEN status='PAID' THEN total_cents ELSE 0 END),0) revenue,COALESCE(SUM(CASE WHEN status='PAID' THEN 1 ELSE 0 END),0) paid,COALESCE(SUM(CASE WHEN status='CANCELLED' THEN 1 ELSE 0 END),0) cancelled FROM orders WHERE date(COALESCE(completed_at,unpaid_at,opened_at))=date('now','localtime')").get();const top=db.prepare("SELECT product_name_snapshot name,SUM(quantity) quantity FROM order_items i JOIN orders o ON o.id=i.order_id WHERE o.status='PAID' AND date(o.completed_at)=date('now','localtime') GROUP BY product_name_snapshot ORDER BY quantity DESC LIMIT 8").all();r.json({...t,revenue:eur(t.revenue),top})});
 app.get("/api/audit",admin,(q,r)=>r.json(db.prepare("SELECT a.*,u.name actor_name FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 500").all()));
 app.use((q,r)=>q.path.startsWith("/api/")?r.status(404).json({error:"Rruga nuk u gjet."}):r.sendFile(path.join(__dirname,"public","index.html")));
-app.listen(Number(process.env.PORT||3000),()=>console.log("Sharri POS: http://localhost:"+(process.env.PORT||3000)));
+const PORT=Number(process.env.PORT||3000);
+app.listen(PORT,"0.0.0.0",()=>console.log("Sharri POS listening on port "+PORT));
