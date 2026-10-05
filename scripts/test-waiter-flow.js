@@ -121,6 +121,9 @@ async function main() {
     };
 
     ok(srcOfProduct("Laqko") === "/images/lasko.jpg", "Laqko shfaq lasko.jpg (birrë), jo tortë");
+    ok(srcOfProduct("Laqin") === "/images/laqin.png", "Laqin shfaq foton e produktit");
+    ok(srcOfProduct("Ujë Mokne") === "/images/uje-mokne.png", "Ujë Mokne shfaq foton e shishes");
+    ok(srcOfProduct("Schweeps") === "/images/schwepps.png", "Schweeps shfaq foton e produktit");
     ok(srcOfProduct("Ice Smirnof") === "/images/smirnoff-ice.jpg", "Ice Smirnof shfaq smirnoff-ice.jpg");
     ok(srcOfProduct("Henikeni") === "/images/heineken.jpg", "Henikeni shfaq heineken.jpg");
     ok(srcOfProduct("Bavaria") === "/images/bavaria.jpg", "Bavaria shfaq bavaria.jpg");

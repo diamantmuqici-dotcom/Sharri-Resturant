@@ -1,6 +1,6 @@
 # Image asset sources
 
-All menu images are ordinary product/stock photography (not AI-generated) and are stored locally in `public/images/`. The app never hotlinks third-party hosts: each card loads `/images/<name>.jpg` from this folder.
+All menu images are ordinary product/stock photography (not AI-generated) and are stored locally in `public/images/`. The app never hotlinks third-party hosts: each card loads a local image from this folder.
 
 ## Drinks
 
@@ -8,10 +8,12 @@ All menu images are ordinary product/stock photography (not AI-generated) and ar
 | --- | --- | --- |
 | `coca-cola.jpg` | Kokakolla | [Pexels, Coke bottle photography](https://www.pexels.com/search/coke%20bottle/) |
 | `fanta.jpg` | Fanta | [Fanta Orange product listing](https://www.amazon.com/Fanta-Orange-500ml/dp/B005LLZD78) |
-| `schweppes.jpg` | Schweeps | [Schweppes product listing](https://amazon.com/clp/B00H3T1CUS) |
+| `schwepps.png` | Schweeps | [Schweppes product listing](https://amazon.com/clp/B00H3T1CUS), cut out from the bundled `schwepps.jpg` source. |
 | `red-bull.jpg` | RedBull | [Red Bull product photo](https://howtomarkettome.com/original-red-bull-can) |
 | `golden-eagle.jpg` | Golden Eagle | [AlbProducts, Golden Eagle Energy Drink](https://albproducts.com/products/golden-eagle-energy-drink) |
-| `juice.jpg` | Juice / fresh drinks | [Pexels, orange juice](https://www.pexels.com/photo/breakfast-morning-orange-juice-3558/) |
+| `laqin.png` | Laqin / Lacin bottled drink | Cropped transparent cutout from the existing local product image (`juice.jpg`). |
+| `uje-mokne.png` | Ujë Mokne 0.33L | [Mokne official product image](https://mokne.com/wp-content/uploads/2024/05/product-0-33-2.png) |
+| `juice.jpg` | Legacy drink fallback (bottle label reads Lacin) | Bundled with the earlier menu photo set. |
 | `coffee.jpg` | Kafe | [Pexels, coffee cup](https://www.pexels.com/photo/overhead-view-of-a-cup-of-coffee-23031405/) |
 | `tea.jpg` | Qaj | [Pexels, black tea](https://www.pexels.com/search/black%20tea/) |
 
