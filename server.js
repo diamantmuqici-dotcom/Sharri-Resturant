@@ -23,6 +23,7 @@ function total(id){return db.prepare("SELECT COALESCE(SUM(quantity*unit_price_ce
 function items(id){return db.prepare("SELECT * FROM order_items WHERE order_id=? ORDER BY id").all(id)}
 function order(id){return db.prepare("SELECT o.*,t.number table_number,u.name waiter_name FROM orders o LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users u ON u.id=o.waiter_id WHERE o.id=?").get(id)}
 function food(k){return k==="USHQIM"||k==="EMBELSIRE"}
+function noteText(v){const s=String(v==null?"":v).replace(/\s+/g," ").trim();return s?s.slice(0,200):null}
 app.get("/api/health",(q,r)=>r.json({ok:true,service:"sharri-pos"}));
 app.get("/api/sesioni",(q,r)=>q.session.user?r.json({loggedIn:true,user:q.session.user}):r.json({loggedIn:false}));
 app.post("/api/kycu",(q,r)=>{const u=db.prepare("SELECT * FROM users WHERE username=? AND active=1").get(String(q.body.username||""));if(!u||!bcrypt.compareSync(String(q.body.password||""),u.password_hash))return r.status(401).json({error:"Përdoruesi ose fjalëkalimi nuk është i saktë."});q.session.user={id:u.id,username:u.username,name:u.name,role:u.role};audit(u.id,"KYÇJE","USER",u.id);r.json({ok:true,user:q.session.user})});
@@ -35,10 +36,10 @@ app.post("/api/porosi",auth,(q,r)=>{
  const type=String(q.body.orderType||""),table=Number(q.body.tableNumber),name=String(q.body.customIdentifier||"").trim(),raw=Array.isArray(q.body.items)?q.body.items:[];
  if(!raw.length)return r.status(400).json({error:"Shtoni të paktën një produkt."});
  const ps=db.prepare("SELECT * FROM products WHERE active=1").all(),map=new Map(ps.map(x=>[x.id,x])),arr=[];
- for(const x of raw){const p=map.get(Number(x.productId)),n=Math.floor(Number(x.quantity));if(!p||n<1||n>999)return r.status(400).json({error:"Produkti ose sasia nuk është e vlefshme."});arr.push({p,n})}
+ for(const x of raw){const p=map.get(Number(x.productId)),n=Math.floor(Number(x.quantity));if(!p||n<1||n>999)return r.status(400).json({error:"Produkti ose sasia nuk është e vlefshme."});arr.push({p,n,notes:noteText(x.notes)})}
  const hasFood=arr.some(x=>food(x.p.kind));
  if(!["TAVOLINE","EMER","ME_VETI","PER_KETU"].includes(type))return r.status(400).json({error:"Lloji i porosisë nuk është i vlefshëm."});
- if((type==="ME_VETI"||type==="PER_KETU")&&!hasFood)return r.status(400).json({error:"Me veti dhe Për këtu lejohen vetëm kur porosia përmban ushqim."});
+ if((type==="ME_VETI"||type==="PER_KETU")&&!hasFood)return r.status(400).json({error:"Me veti dhe Për këtu lejohen vetëm kur porosia përmban ushqim (shtesat nuk mjaftojnë vetë)."});
  let tableId=null;if(type==="TAVOLINE"){if(!Number.isInteger(table)||table<1||table>50)return r.status(400).json({error:"Zgjidhni tavolinë nga 1 deri në 50."});tableId=table;if(db.prepare("SELECT id FROM orders WHERE table_id=? AND status IN ('ACTIVE','PAYMENT_PENDING')").get(tableId))return r.status(409).json({error:"Kjo tavolinë ka një porosi aktive."})}
  if(type==="EMER"&&!name)return r.status(400).json({error:"Shkruani emrin ose identifikuesin."});
  const no=db.prepare("SELECT COALESCE(MAX(order_number),0)+1 n FROM orders").get().n;
@@ -47,21 +48,34 @@ app.post("/api/porosi",auth,(q,r)=>{
  const tx=db.transaction(()=>{
    const o=db.prepare("INSERT INTO orders(order_number,order_type,table_id,custom_identifier,waiter_id,total_cents) VALUES(?,?,?,?,?,?)").run(no,type,tableId,type==="EMER"?name:null,q.session.user.id,sum);
    const orderId=o.lastInsertRowid;
-   for(const x of arr)db.prepare("INSERT INTO order_items(order_id,product_id,product_name_snapshot,unit_price_cents,quantity,created_at) VALUES(?,?,?,?,?,?)").run(orderId,x.p.id,x.p.name,x.p.price_cents,x.n,createdAt);
-   event(orderId,"POROSI_U_KRIJUA",{type,total:sum,items:arr.map(x=>({product:x.p.name,quantity:x.n}))},q.session.user.id,createdAt);
+   for(const x of arr)db.prepare("INSERT INTO order_items(order_id,product_id,product_name_snapshot,unit_price_cents,quantity,notes,created_at) VALUES(?,?,?,?,?,?,?)").run(orderId,x.p.id,x.p.name,x.p.price_cents,x.n,x.notes,createdAt);
+   event(orderId,"POROSI_U_KRIJUA",{type,total:sum,items:arr.map(x=>({product:x.p.name,quantity:x.n,notes:x.notes}))},q.session.user.id,createdAt);
    audit(q.session.user.id,"KRIJO_POROSI","ORDER",orderId);
    return orderId;
  });
  r.json({ok:true,id:tx()})});
 app.post("/api/porosi/:id/shto",auth,(q,r)=>{
- const o=order(q.params.id),p=db.prepare("SELECT * FROM products WHERE id=? AND active=1").get(Number(q.body.productId));
+ const o=order(q.params.id),p=db.prepare("SELECT * FROM products WHERE id=? AND active=1").get(Number(q.body.productId)),notes=noteText(q.body.notes);
  if(!o||o.status!=="ACTIVE"||!p)return r.status(400).json({error:"Porosia ose produkti nuk është aktiv."});
  const createdAt=now();
  const tx=db.transaction(()=>{
-   const i=db.prepare("INSERT INTO order_items(order_id,product_id,product_name_snapshot,unit_price_cents,quantity,created_at) VALUES(?,?,?,?,1,?)").run(o.id,p.id,p.name,p.price_cents,createdAt);
+   const i=db.prepare("INSERT INTO order_items(order_id,product_id,product_name_snapshot,unit_price_cents,quantity,notes,created_at) VALUES(?,?,?,?,1,?,?)").run(o.id,p.id,p.name,p.price_cents,notes,createdAt);
    const s=total(o.id);
    db.prepare("UPDATE orders SET total_cents=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(s,o.id);
-   event(o.id,"PRODUKT_U_SHTUA",{itemId:i.lastInsertRowid,produkt:p.name,quantity:1},q.session.user.id,createdAt);
+   event(o.id,"PRODUKT_U_SHTUA",{itemId:i.lastInsertRowid,produkt:p.name,quantity:1,notes},q.session.user.id,createdAt);
+ });
+ tx();
+ r.json({ok:true})
+});
+app.patch("/api/porosi/:id/shenim",auth,(q,r)=>{
+ const o=order(q.params.id),i=db.prepare("SELECT * FROM order_items WHERE id=? AND order_id=?").get(Number(q.body.itemId),q.params.id),notes=noteText(q.body.notes);
+ if(!o||o.status!=="ACTIVE"||!i)return r.status(400).json({error:"Porosia ose produkti nuk është aktiv."});
+ if((i.notes||null)===notes)return r.json({ok:true});
+ const changedAt=now();
+ const tx=db.transaction(()=>{
+   db.prepare("UPDATE order_items SET notes=? WHERE id=?").run(notes,i.id);
+   db.prepare("UPDATE orders SET updated_at=CURRENT_TIMESTAMP WHERE id=?").run(o.id);
+   event(o.id,"SHENIM_U_NDRYSHUA",{itemId:i.id,produkt:i.product_name_snapshot,from:i.notes||null,to:notes},q.session.user.id,changedAt);
  });
  tx();
  r.json({ok:true})

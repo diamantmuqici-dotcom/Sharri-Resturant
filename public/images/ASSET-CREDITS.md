@@ -40,6 +40,19 @@ All four beers live in the **Pije** category. `birra-peja.jpg` is reused for bot
 | `pizza.jpg` | Pica (all sizes) | Bundled with the earlier menu photo set |
 | `tuna-sandwich.jpg` | Sandwich Tuna | Bundled with the earlier menu photo set |
 | `grilled-chicken.jpg` | Pule / File Pule / Gjys Pule | Bundled with the earlier menu photo set |
-| `grill-platter.jpg` | Default Mish dhe Ushqim / Menze | Bundled with the earlier menu photo set |
+| `grill-platter.jpg` | Pjatë ushqimi 5€ / default Mish dhe Ushqim / Menze | Bundled with the earlier menu photo set |
+
+## Shtesa (add-ons)
+
+The Shtesa category is a separate tab in the order screen, so an order of only add-ons is easy to spot. Add-ons carry their own price; a food item ordered "komplet" keeps its normal price and only carries a note.
+
+| File | Product | Source |
+| --- | --- | --- |
+| `suxhuk.jpg` | Suxhuk (1 copë) | [StockFood-style sujuk sausage photography](https://mezze.my/sujuk-slices-spicy-sausage-pan-fried/) |
+| `pomfrit.jpg` | Pomfrit (1 porcion) / Gjys pomfrit | [KitchenSeer, plate of french fries](https://kitchenseer.com/how-big-is-serving-of-french-fries/) |
+| `qepa.jpg` | Qepë (1 copë) | [Onion cut in half stock photo](https://www.vecteezy.com/free-photos/white-onion) |
+| `spec-i-pjekur.jpg` | Spec i pjekur (1 copë) | [JamJarKitchen, grilled bell peppers](https://jamjarkitchen.com/2021/06/21/easy-grilled-bell-peppers/) |
+| `extra-djath.jpg` | Extra djath | [White brined cheese slices on a wooden board](https://gettyimages.com/photos/white-cheese-slice) |
+| `domat-tranguj.jpg` | Domat tranguj | [Tomato cucumber salad, top view on white](https://www.istockphoto.com/photos/cucumber-tomato-salad) |
 
 Product-brand trademarks remain with their owners. Verify image usage rights for your production deployment before going live.
