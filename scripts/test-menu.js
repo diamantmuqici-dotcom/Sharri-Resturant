@@ -127,6 +127,10 @@ for (const p of activeProducts)
      `"${p.name}" ka foto lokale (${srcOf(p.name, p.kind, p.category_name) || "ASNJË"})`);
 
 section("4. Rregullat e fotove të pijeve");
+ok(srcOf("Laqin", "PIJE", "Pije") === "/images/laqin.png", "Laqin → foto lokale e produktit");
+ok(srcOf("Lacin", "PIJE", "Pije") === "/images/laqin.png", "Lacin përdor të njëjtën foto të produktit");
+ok(srcOf("Ujë Mokne", "PIJE", "Pije") === "/images/uje-mokne.png", "Ujë Mokne → foto lokale e shishes");
+ok(srcOf("Schweeps", "PIJE", "Pije") === "/images/schwepps.png", "Schweeps → foto lokale (emri i saktë i skedarit)");
 ok(srcOf("Laqko", "PIJE", "Pije") === "/images/lasko.jpg", "Laqko → lasko.jpg (jo tortë)");
 ok(srcOf("Laqko", "EMBELSIRE", "Ëmbëlsira") === "/images/lasko.jpg", "Laqko me kategori të vjetër 'Ëmbëlsira' nuk bie në foto torte");
 ok(srcOf("Laqko", "PIJE", "Të tjera") === "/images/lasko.jpg", "Laqko me kategori të vjetër 'Të tjera' nuk bie në foto torte");
