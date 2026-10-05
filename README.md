@@ -30,7 +30,7 @@ Baza krijohet automatikisht në data/sharri.db.
 
 ## Menuja dhe fotot
 - Çmimet ruhen në cent, shfaqen në euro: Hamburger 2.00€, Hamburger + Pomfrit 2.50€, Qebap (1 copë) 0.50€, Pica e madhe 4.00€, Pica familjare 7.00€, Pica e mesme 3.00€, Pica e vogel 2.00€.
-- Birrat janë në kategorinë **Pije**: Birra Peje E vogel, Birra Peje E madhe (e njëjta foto për të dyja), Laqko (Laško), Bavaria, Ice Smirnof, Henikeni. Laqko nuk lidhet kurrë me foto torte.
+- Birrat janë në kategorinë **Pije**: Birra Peje (1.00€, e bashkuar nga dy rreshtat e vjetër "Birra Peje E vogel"/"Birra Peje E madhe"), Laqko (Laško), Bavaria, Ice Smirnof, Henikeni. Laqko nuk lidhet kurrë me foto torte; Laqin (0.50€) ka foton e vet të limonadës (`laqin.jpg`).
 - Fotot janë foto reale produkti/stock, të ruajtura lokalisht në `public/images` dhe lidhen në `public/app.js` (`productPhoto`). Nuk ka hotlink. Burimet: `public/images/ASSET-CREDITS.md`.
 
 ## Sinkronizimi i menusë në një bazë ekzistuese

@@ -15,7 +15,7 @@ const cats=[["Pije",1],["Mish dhe Ushqim",2],["Ëmbëlsira",3],["Menze",4],["Të
 for(const c of cats)db.prepare("INSERT OR IGNORE INTO categories(name,display_order) VALUES(?,?)").run(...c);
 const cid=n=>db.prepare("SELECT id FROM categories WHERE name=?").get(n).id;
 const ps=[
-["Pije","Kokakolla",100,"PIJE"],["Pije","Fanta",100,"PIJE"],["Pije","Birra Peje E vogel",100,"PIJE"],["Pije","Birra Peje E madhe",100,"PIJE"],["Pije","Schweeps",100,"PIJE"],["Pije","RedBull",150,"PIJE"],["Pije","Golden Eagle",100,"PIJE"],["Pije","Kafe",70,"KAFE"],["Pije","Qaj",70,"KAFE"],["Pije","Laqin",50,"PIJE"],["Pije","Laqko",150,"PIJE"],["Pije","Ice Smirnof",150,"PIJE"],["Pije","Henikeni",150,"PIJE"],["Pije","Bavaria",150,"PIJE"],
+["Pije","Kokakolla",100,"PIJE"],["Pije","Fanta",100,"PIJE"],["Pije","Birra Peje",100,"PIJE"],["Pije","Schweeps",100,"PIJE"],["Pije","RedBull",150,"PIJE"],["Pije","Golden Eagle",100,"PIJE"],["Pije","Kafe",70,"KAFE"],["Pije","Qaj",70,"KAFE"],["Pije","Laqin",50,"PIJE"],["Pije","Laqko",150,"PIJE"],["Pije","Ice Smirnof",150,"PIJE"],["Pije","Henikeni",150,"PIJE"],["Pije","Bavaria",150,"PIJE"],
 ["Mish dhe Ushqim","File Pule",300,"USHQIM"],["Mish dhe Ushqim","Mish i Bardh",350,"USHQIM"],["Mish dhe Ushqim","Pule",600,"USHQIM"],["Mish dhe Ushqim","Gjys Pule",300,"USHQIM"],["Mish dhe Ushqim","Kombinim Skare",400,"USHQIM"],["Mish dhe Ushqim","Mish Viqi Natyral",500,"USHQIM"],["Mish dhe Ushqim","Mish Viqi (1kg)",2500,"USHQIM"],["Mish dhe Ushqim","Pleskavicë Sharri",400,"USHQIM"],["Mish dhe Ushqim","Hamburger",200,"USHQIM"],["Mish dhe Ushqim","Hamburger + Pomfrit",250,"USHQIM"],["Mish dhe Ushqim","Sandwich Tuna",200,"USHQIM"],["Mish dhe Ushqim","Qebap (1 copë)",50,"USHQIM"],["Mish dhe Ushqim","Pica Familjare",700,"USHQIM"],["Mish dhe Ushqim","Pica E madhe",400,"USHQIM"],["Mish dhe Ushqim","Pica E mesme",300,"USHQIM"],["Mish dhe Ushqim","Pica E vogel",200,"USHQIM"],
 ["Ëmbëlsira","Trileqe",150,"EMBELSIRE"],["Ëmbëlsira","Torte Snikers",150,"EMBELSIRE"]
 ,["Menze","Menze 5€",500,"USHQIM"],["Menze","Menze 10€",1000,"USHQIM"],["Menze","Menze 15€",1500,"USHQIM"],["Menze","Menze 20€",2000,"USHQIM"],["Menze","Menze 25€",2500,"USHQIM"],["Menze","Menze 50€",5000,"USHQIM"]
@@ -25,8 +25,10 @@ const updateProduct=db.prepare("UPDATE products SET category_id=?,price_cents=?,
 const renameProduct=db.prepare("UPDATE products SET name=? WHERE id=?");
 const deactivateOtherNames=db.prepare("UPDATE products SET active=0 WHERE name=? AND id<>?");
 const deactivateOtherCategory=db.prepare("UPDATE products SET active=0 WHERE name=? AND category_id<>?");
+const deactivateAlias=db.prepare("UPDATE products SET active=0 WHERE name=?");
 const insertProduct=db.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)");
 const renames={"Qebap (1 copë)":["Qebapa","Qebap"]};
+const aliases={"Birra Peje":["Birra Peje E vogel","Birra Peje E madhe"]};
 const sync= db.transaction(function(){
   db.prepare("UPDATE products SET active=0").run();
   db.prepare("UPDATE categories SET active=CASE WHEN name IN ('Pije','Mish dhe Ushqim','Ëmbëlsira','Menze') THEN 1 ELSE 0 END").run();
@@ -41,6 +43,7 @@ const sync= db.transaction(function(){
     }else{
       insertProduct.run(categoryId,name,p[2],p[3],i+1);
     }
+    for(const old of (aliases[name]||[]))deactivateAlias.run(old);
   });
 });
 sync();

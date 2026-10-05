@@ -9,8 +9,8 @@
  *     "Mish dhe Ushqim" (the real productCard/productPhoto from public/app.js)
  *   - every rendered photo URL is actually served by the server (HTTP 200)
  *   - an ACTIVE order picker renders the same photos
- *   - Laqko is never a cake, the three drinks have working images, both Peja
- *     sizes share one image
+ *   - Laqko is never a cake, the drinks have working images, the merged Birra Peje
+ *     shows birra-peja.jpg and Laqin shows its lemonade photo laqin.jpg
  */
 const fs = require("fs");
 const path = require("path");
@@ -84,7 +84,7 @@ async function main() {
       ["Qebap (1 copë)", 50, "Mish dhe Ushqim"], ["Pica E madhe", 400, "Mish dhe Ushqim"],
       ["Pica Familjare", 700, "Mish dhe Ushqim"], ["Pica E mesme", 300, "Mish dhe Ushqim"],
       ["Pica E vogel", 200, "Mish dhe Ushqim"], ["Ice Smirnof", 150, "Pije"], ["Henikeni", 150, "Pije"],
-      ["Bavaria", 150, "Pije"], ["Laqko", 150, "Pije"],
+      ["Bavaria", 150, "Pije"], ["Laqko", 150, "Pije"], ["Laqin", 50, "Pije"], ["Birra Peje", 100, "Pije"],
     ];
     for (const [n, cents, cat] of PRICES)
       ok(byName(n) && byName(n).price_cents === cents && byName(n).category_id === catId(cat),
@@ -124,8 +124,9 @@ async function main() {
     ok(srcOfProduct("Ice Smirnof") === "/images/smirnoff-ice.jpg", "Ice Smirnof shfaq smirnoff-ice.jpg");
     ok(srcOfProduct("Henikeni") === "/images/heineken.jpg", "Henikeni shfaq heineken.jpg");
     ok(srcOfProduct("Bavaria") === "/images/bavaria.jpg", "Bavaria shfaq bavaria.jpg");
-    ok(srcOfProduct("Birra Peje E vogel") === srcOfProduct("Birra Peje E madhe"), "të dy Pejat shfaqin të njëjtën foto");
-    ok(srcOfProduct("Birra Peje E vogel") === "/images/birra-peja.jpg", "Peja shfaq birra-peja.jpg");
+    ok(menu.products.filter(p => /pej/i.test(p.name)).length === 1, "në menu ka saktësisht një produkt Peja ('Birra Peje')", menu.products.filter(p => /pej/i.test(p.name)).map(p => p.name).join(", "));
+    ok(srcOfProduct("Birra Peje") === "/images/birra-peja.jpg", "Birra Peja shfaq birra-peja.jpg");
+    ok(srcOfProduct("Laqin") === "/images/laqin.jpg", "Laqin shfaq laqin.jpg (limonadë), jo juice.jpg");
     for (const d of ["Ice Smirnof", "Henikeni", "Bavaria", "Laqko"])
       ok(byName(d).category_id === catId("Pije"), `"${d}" shfaqet nën 'Pije', jo 'Të tjera'/'Ëmbëlsira'`);
 
