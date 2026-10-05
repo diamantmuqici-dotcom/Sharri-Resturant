@@ -38,6 +38,7 @@ All four beers live in the **Pije** category. `birra-peja.jpg` is reused for bot
 | `trileqe.jpg` | Trileqe | [Unicorns in the Kitchen, Trilece Turkish Milk Cake](https://www.unicornsinthekitchen.com/trilece-turkish-milk-cake/) |
 | `snickers-cake.jpg` | Torte Snikers | Bundled with the earlier menu photo set |
 | `burger-sandwich.jpg` | Hamburger / Hamburger + Pomfrit | Bundled with the earlier menu photo set |
+| `burger-mish-i-bardh.jpg` | Hamburger + Mish i Bardh | [Eight Forest Lane, Spicy Chicken Burgers](https://eightforestlane.com/spicy-chicken-burgers/); cropped to 3:2, resized to 900×600 and stripped of metadata with ImageMagick. |
 | `pizza.jpg` | Pica (all sizes) | Bundled with the earlier menu photo set |
 | `tuna-sandwich.jpg` | Sandwich Tuna | Bundled with the earlier menu photo set |
 | `grilled-chicken.jpg` | Pule / File Pule / Gjys Pule | Bundled with the earlier menu photo set |

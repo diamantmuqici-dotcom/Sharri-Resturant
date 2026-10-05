@@ -32,7 +32,8 @@ Kërkohet Node.js 20+.
 Baza krijohet automatikisht në data/sharri.db.
 
 ## Menuja dhe fotot
-- Çmimet ruhen në cent, shfaqen në euro: Hamburger 2.00€, Hamburger + Pomfrit 2.50€, Qebap (1 copë) 0.50€, Pjatë ushqimi 5.00€, Pica e madhe 4.00€, Pica familjare 7.00€, Pica e mesme 3.00€, Pica e vogel 2.00€.
+- Çmimet ruhen në cent, shfaqen në euro: Hamburger 2.00€, Hamburger + Pomfrit 2.50€, Hamburger + Mish i Bardh 2.50€, Qebap (1 copë) 0.50€, Pjatë ushqimi 5.00€, Pica e madhe 4.00€, Pica familjare 7.00€, Pica e mesme 3.00€, Pica e vogel 2.00€.
+- **Hamburger + Mish i Bardh** (2.50€) është burger me mish të bardhë, në kategorinë *Mish dhe Ushqim*, me foto të vet: `public/images/burger-mish-i-bardh.jpg`. Produktet e tjera me mish të bardhë nuk preken: Pule, File Pule dhe Gjys Pule mbeten me foton e mishit të pjekur, ndërsa Mish i Bardh i thjeshtë mbetet me foton e pjatës.
 - Kategoria **Shtesa** mban shtesat me çmim të vetin: Suxhuk (1 copë) 1.00€, Pomfrit (1 porcion) 2.00€, Gjys pomfrit 1.50€, Qepë (1 copë) 1.00€, Spec i pjekur (1 copë) 0.50€, Extra djath 0.50€, Domat tranguj 1.00€. Shtesat nuk e bëjnë porosinë "komplet" dhe nuk numërohen si ushqim (porosi vetëm me shtesa nuk lejohet si "Me veti"/"Për këtu").
 - Birrat janë në kategorinë **Pije**: Birra Peje E vogel, Birra Peje E madhe (e njëjta foto për të dyja), Laqko (Laško), Bavaria, Ice Smirnof, Henikeni. Laqko nuk lidhet kurrë me foto torte.
 - Jägermeister (liker bimore, 35%) është në **Pije** me 2.50€ për porcion (1.00€–4.00€ është intervali i lejuar; për ta ndryshuar çmimin ndrysho `db.js` dhe ekzekuto `npm run seed`). Foto: `public/images/jagermeister.png`.
@@ -68,6 +69,6 @@ Lokalisht:
 
     npm test
 
-Kontrolli përfshin: sintaksën (`node --check` për `server.js`, `db.js`, `public/app.js`), menunë dhe çmimet në bazë (përfshirë *Shtesa* dhe *Pjatë ushqimi*), mapimin e fotove në frontend, migrimin e një baze ekzistuese pa prekur porositë/pagesat, dhe rrjedhën e kamarierit në "POROSI E RE" (fotot nën *Pije* dhe *Mish dhe Ushqim*, për porosi të re dhe aktive, si dhe shenimet e artikujve: “komplet” mbetet çmim normal, shtesa veç, ndryshimi i shenimit në kronologji).
+Kontrolli përfshin: sintaksën (`node --check` për `server.js`, `db.js`, `public/app.js`), menunë dhe çmimet në bazë (përfshirë *Shtesa*, *Pjatë ushqimi* dhe *Hamburger + Mish i Bardh*), mapimin e fotove në frontend (burgeri me mish të bardhë ka foto të vet, mishi i bardhë i thjeshtë mbetet me foton e mishit të pjekur), migrimin e një baze ekzistuese pa prekur porositë/pagesat (edhe shtimin e produktit të re në një bazë të vjetër), dhe rrjedhën e kamarierit në "POROSI E RE" (fotot nën *Pije* dhe *Mish dhe Ushqim*, për porosi të re dhe aktive, si dhe shenimet e artikujve: “komplet” mbetet çmim normal, shtesa veç, ndryshimi i shenimit në kronologji).
 
 Shënim: `better-sqlite3` kompilohet në instalim. Përdor Node 22 (p.sh. me `fnm use 22`); Node 26+ nuk e kompilon versionin 11.x.
