@@ -9,8 +9,8 @@
  *     "Mish dhe Ushqim" (the real productCard/productPhoto from public/app.js)
  *   - every rendered photo URL is actually served by the server (HTTP 200)
  *   - an ACTIVE order picker renders the same photos
- *   - Laqko is never a cake, the three drinks have working images, both Peja
- *     sizes share one image
+ *   - Laqko is never a cake, the drinks have working images, and Peja uses its
+ *     local beer image
  */
 const fs = require("fs");
 const path = require("path");
@@ -127,8 +127,7 @@ async function main() {
     ok(srcOfProduct("Ice Smirnof") === "/images/smirnoff-ice.jpg", "Ice Smirnof shfaq smirnoff-ice.jpg");
     ok(srcOfProduct("Henikeni") === "/images/heineken.jpg", "Henikeni shfaq heineken.jpg");
     ok(srcOfProduct("Bavaria") === "/images/bavaria.jpg", "Bavaria shfaq bavaria.jpg");
-    ok(srcOfProduct("Birra Peje E vogel") === srcOfProduct("Birra Peje E madhe"), "të dy Pejat shfaqin të njëjtën foto");
-    ok(srcOfProduct("Birra Peje E vogel") === "/images/birra-peja.jpg", "Peja shfaq birra-peja.jpg");
+    ok(srcOfProduct("Birra Peje") === "/images/birra-peja.jpg", "Peja shfaq birra-peja.jpg");
     for (const d of ["Ice Smirnof", "Henikeni", "Bavaria", "Laqko"])
       ok(byName(d).category_id === catId("Pije"), `"${d}" shfaqet nën 'Pije', jo 'Të tjera'/'Ëmbëlsira'`);
 
@@ -148,6 +147,81 @@ async function main() {
     ok(order.items.length === 2 && order.items.some(i => i.product_name_snapshot === "Qebap (1 copë)"),
       "porosia aktive ruan snapshot-in e saktë të emrit", order.items.map(i => i.product_name_snapshot).join(", "));
     ok(order.total_cents === 150 + 100, "totali llogaritet saktë (1.50€ + 2 × 0.50€)", (order.total_cents / 100).toFixed(2) + "\u20ac");
+
+    /* ---- product-level timestamps and a durable order change history */
+    const coffee = byName("Kafe"), auditBeer = byName("Birra Peje");
+    const changeOrderResponse = await fetch(BASE + "/api/porosi", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ orderType: "TAVOLINE", tableNumber: 8, items: [{ productId: coffee.id, quantity: 1 }] }),
+    });
+    const changeOrderBody = await changeOrderResponse.json();
+    const coffeeOrder = await jget("/api/porosi/" + changeOrderBody.id);
+    const coffeeItem = coffeeOrder.items.find(i => i.product_name_snapshot === coffee.name);
+    ok(changeOrderResponse.ok && coffeeItem && Number.isFinite(Date.parse(coffeeItem.created_at)),
+      "kafeja ruan datën dhe orën kur u regjistrua në porosi", coffeeItem && coffeeItem.created_at);
+
+    const escFn = new Function("return " + extractFunction(appJs, "esc"))();
+    const dtFn = new Function("return " + extractFunction(appJs, "dt"))();
+    const tmFn = new Function("return " + extractFunction(appJs, "tm"))();
+    const itemTimestamp = new Function("esc", "dt", "tm", "return " + extractFunction(appJs, "itemTimestamp"))(escFn, dtFn, tmFn);
+    const coffeeTimeHtml = itemTimestamp(coffeeItem, false);
+    ok(coffeeTimeHtml.includes("datetime=\"" + coffeeItem.created_at + "\"") && /Shtuar në \d{2}:\d{2}/.test(coffeeTimeHtml),
+      "ora e shtimit të produktit shfaqet pranë tij në porosinë aktive");
+
+    await sleep(15);
+    const beerAddResponse = await fetch(BASE + "/api/porosi/" + changeOrderBody.id + "/shto", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ productId: auditBeer.id }),
+    });
+    const withBeer = await jget("/api/porosi/" + changeOrderBody.id);
+    const beerItem = withBeer.items.find(i => i.product_name_snapshot === auditBeer.name);
+    const beerAdded = withBeer.events.find(e => e.event_type === "PRODUKT_U_SHTUA");
+    const beerAddedData = beerAdded && JSON.parse(beerAdded.details);
+    ok(beerAddResponse.ok && beerItem && Date.parse(beerItem.created_at) > Date.parse(coffeeItem.created_at),
+      "birra merr orën e vet më të vonshme kur shtohet në porosinë ekzistuese", beerItem && beerItem.created_at);
+    ok(beerAdded && beerAddedData.produkt === auditBeer.name && beerAddedData.itemId === beerItem.id && beerAdded.actor_name === "Kamarieri",
+      "historiku ruan produktin, rreshtin dhe kamarierin që e shtoi birrën");
+
+    const eventPayload = new Function("return " + extractFunction(appJs, "eventPayload"))();
+    const activityText = new Function("eventPayload", "return " + extractFunction(appJs, "activityText"))(eventPayload);
+    const orderActivity = new Function("esc", "dt", "tm", "activityText", "return " + extractFunction(appJs, "orderActivity"))(escFn, dtFn, tmFn, activityText);
+    const activityHtml = orderActivity(withBeer.events, true);
+    ok(activityHtml.includes("U krijua porosia · Kafe × 1") && activityHtml.includes("U shtua " + auditBeer.name),
+      "ndryshimet shfaqen si kronologji me produktin përkatës");
+
+    const quantityResponse = await fetch(BASE + "/api/porosi/" + changeOrderBody.id + "/sasia", {
+      method: "PATCH", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ itemId: coffeeItem.id, quantity: 2 }),
+    });
+    const quantityOrder = await jget("/api/porosi/" + changeOrderBody.id);
+    const quantityEvent = quantityOrder.events.find(e => e.event_type === "PRODUKT_SASIA_NDRYSHUA");
+    ok(quantityResponse.ok && quantityEvent && JSON.parse(quantityEvent.details).from === 1 && JSON.parse(quantityEvent.details).to === 2,
+      "ndryshimi i sasisë regjistrohet me vlerën e vjetër dhe të renë");
+
+    const removeResponse = await fetch(BASE + "/api/porosi/" + changeOrderBody.id + "/sasia", {
+      method: "PATCH", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ itemId: beerItem.id, quantity: 0 }),
+    });
+    const afterRemove = await jget("/api/porosi/" + changeOrderBody.id);
+    ok(removeResponse.ok && !afterRemove.items.some(i => i.id === beerItem.id) && afterRemove.events.some(e => e.event_type === "PRODUKT_U_HOQ"),
+      "heqja e artikullit ruhet në historik edhe pasi hiqet nga lista aktive");
+    const rejectEmpty = await fetch(BASE + "/api/porosi/" + changeOrderBody.id + "/sasia", {
+      method: "PATCH", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ itemId: coffeeItem.id, quantity: 0 }),
+    });
+    const afterRejectedRemoval = await jget("/api/porosi/" + changeOrderBody.id);
+    ok(rejectEmpty.status === 400 && afterRejectedRemoval.items.some(i => i.id === coffeeItem.id),
+      "porosia e fundit nuk fshihet gabimisht kur tentohet heqja e artikullit të vetëm");
+
+    const adminLogin = await fetch(BASE + "/api/kycu", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "admin", password: "admin" }),
+    });
+    const adminCookie = (adminLogin.headers.get("set-cookie") || "").split(";")[0];
+    const historyDetailResponse = await fetch(BASE + "/api/historiku/" + changeOrderBody.id, { headers: { Cookie: adminCookie } });
+    const historyDetail = await historyDetailResponse.json();
+    ok(historyDetailResponse.ok && historyDetail.items[0].created_at === coffeeItem.created_at && historyDetail.events.some(e => e.event_type === "PRODUKT_U_SHTUA"),
+      "administrata sheh të njëjtat orë artikujsh dhe ndryshimesh në historikun e porosisë");
   } finally {
     stop();
   }

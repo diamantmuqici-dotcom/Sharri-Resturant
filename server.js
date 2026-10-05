@@ -17,7 +17,8 @@ const eur=c=>(Number(c)/100).toFixed(2)+"€";
 const auth=(req,res,next)=>req.session.user?next():res.status(401).json({error:"Duhet të kyçeni."});
 const admin=(req,res,next)=>req.session.user&&req.session.user.role==="ADMIN"?next():res.status(403).json({error:"Nuk keni leje."});
 function audit(a,x,t,id,d){db.prepare("INSERT INTO audit_logs(actor_id,action,entity_type,entity_id,details) VALUES(?,?,?,?,?)").run(a,x,t,id,d?JSON.stringify(d):null)}
-function event(o,x,d,a){db.prepare("INSERT INTO order_events(order_id,event_type,details,actor_id) VALUES(?,?,?,?)").run(o,x,d?JSON.stringify(d):null,a)}
+function now(){return new Date().toISOString()}
+function event(o,x,d,a,createdAt=now()){db.prepare("INSERT INTO order_events(order_id,event_type,details,actor_id,created_at) VALUES(?,?,?,?,?)").run(o,x,d?JSON.stringify(d):null,a,createdAt)}
 function total(id){return db.prepare("SELECT COALESCE(SUM(quantity*unit_price_cents),0) n FROM order_items WHERE order_id=?").get(id).n}
 function items(id){return db.prepare("SELECT * FROM order_items WHERE order_id=? ORDER BY id").all(id)}
 function order(id){return db.prepare("SELECT o.*,t.number table_number,u.name waiter_name FROM orders o LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users u ON u.id=o.waiter_id WHERE o.id=?").get(id)}
@@ -29,7 +30,7 @@ app.post("/api/dil",(q,r)=>q.session.destroy(()=>r.json({ok:true})));
 app.get("/api/menu",auth,(q,r)=>r.json({categories:db.prepare("SELECT * FROM categories WHERE active=1 ORDER BY display_order").all(),products:db.prepare("SELECT p.*,c.name category_name FROM products p JOIN categories c ON c.id=p.category_id WHERE p.active=1 ORDER BY c.display_order,p.display_order").all()}));
 app.get("/api/aktive",auth,(q,r)=>r.json(db.prepare("SELECT o.*,t.number table_number,u.name waiter_name,(SELECT COUNT(*) FROM order_items i WHERE i.order_id=o.id) item_count FROM orders o LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users u ON u.id=o.waiter_id WHERE o.status IN ('ACTIVE','PAYMENT_PENDING') ORDER BY o.opened_at DESC").all()));
 app.get("/api/tavolinat",auth,(q,r)=>{const a=db.prepare("SELECT t.id,t.number,o.id order_id,o.total_cents FROM tables_restaurant t LEFT JOIN orders o ON o.table_id=t.id AND o.status IN ('ACTIVE','PAYMENT_PENDING') ORDER BY t.number").all();const occupied=a.filter(x=>x.order_id).length;r.json({total:50,occupied,free:50-occupied,tables:a})});
-app.get("/api/porosi/:id",auth,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});r.json({...o,items:items(o.id),events:db.prepare("SELECT e.*,u.name actor_name FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY e.created_at").all(o.id)})});
+app.get("/api/porosi/:id",auth,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});r.json({...o,items:items(o.id),events:db.prepare("SELECT e.*,u.name actor_name FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY julianday(e.created_at),e.id").all(o.id)})});
 app.post("/api/porosi",auth,(q,r)=>{
  const type=String(q.body.orderType||""),table=Number(q.body.tableNumber),name=String(q.body.customIdentifier||"").trim(),raw=Array.isArray(q.body.items)?q.body.items:[];
  if(!raw.length)return r.status(400).json({error:"Shtoni të paktën një produkt."});
@@ -42,15 +43,52 @@ app.post("/api/porosi",auth,(q,r)=>{
  if(type==="EMER"&&!name)return r.status(400).json({error:"Shkruani emrin ose identifikuesin."});
  const no=db.prepare("SELECT COALESCE(MAX(order_number),0)+1 n FROM orders").get().n;
  const sum=arr.reduce((s,x)=>s+x.n*x.p.price_cents,0);
- const tx=db.transaction(()=>{const o=db.prepare("INSERT INTO orders(order_number,order_type,table_id,custom_identifier,waiter_id,total_cents) VALUES(?,?,?,?,?,?)").run(no,type,tableId,type==="EMER"?name:null,q.session.user.id,sum);for(const x of arr)db.prepare("INSERT INTO order_items(order_id,product_id,product_name_snapshot,unit_price_cents,quantity) VALUES(?,?,?,?,?)").run(o.lastInsertRowid,x.p.id,x.p.name,x.p.price_cents,x.n);event(o.lastInsertRowid,"POROSI_U_KRIJUA",{type,total:sum},q.session.user.id);audit(q.session.user.id,"KRIJO_POROSI","ORDER",o.lastInsertRowid);return o.lastInsertRowid});r.json({ok:true,id:tx()})});
-app.post("/api/porosi/:id/shto",auth,(q,r)=>{const o=order(q.params.id),p=db.prepare("SELECT * FROM products WHERE id=? AND active=1").get(Number(q.body.productId));if(!o||o.status!=="ACTIVE"||!p)return r.status(400).json({error:"Porosia ose produkti nuk është aktiv."});db.prepare("INSERT INTO order_items(order_id,product_id,product_name_snapshot,unit_price_cents,quantity) VALUES(?,?,?,?,1)").run(o.id,p.id,p.name,p.price_cents);const s=total(o.id);db.prepare("UPDATE orders SET total_cents=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(s,o.id);event(o.id,"PRODUKT_U_SHTUA",{produkt:p.name},q.session.user.id);r.json({ok:true})});
-app.patch("/api/porosi/:id/sasia",auth,(q,r)=>{const o=order(q.params.id),n=Math.floor(Number(q.body.quantity)),i=db.prepare("SELECT * FROM order_items WHERE id=? AND order_id=?").get(Number(q.body.itemId),q.params.id);if(!o||o.status!=="ACTIVE"||!i||n<0)return r.status(400).json({error:"Sasia nuk është e vlefshme."});if(n===0)db.prepare("DELETE FROM order_items WHERE id=?").run(i.id);else db.prepare("UPDATE order_items SET quantity=? WHERE id=?").run(n,i.id);const s=total(o.id);if(!s)return r.status(400).json({error:"Porosia duhet të ketë të paktën një produkt."});db.prepare("UPDATE orders SET total_cents=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(s,o.id);r.json({ok:true})});
+ const createdAt=now();
+ const tx=db.transaction(()=>{
+   const o=db.prepare("INSERT INTO orders(order_number,order_type,table_id,custom_identifier,waiter_id,total_cents) VALUES(?,?,?,?,?,?)").run(no,type,tableId,type==="EMER"?name:null,q.session.user.id,sum);
+   const orderId=o.lastInsertRowid;
+   for(const x of arr)db.prepare("INSERT INTO order_items(order_id,product_id,product_name_snapshot,unit_price_cents,quantity,created_at) VALUES(?,?,?,?,?,?)").run(orderId,x.p.id,x.p.name,x.p.price_cents,x.n,createdAt);
+   event(orderId,"POROSI_U_KRIJUA",{type,total:sum,items:arr.map(x=>({product:x.p.name,quantity:x.n}))},q.session.user.id,createdAt);
+   audit(q.session.user.id,"KRIJO_POROSI","ORDER",orderId);
+   return orderId;
+ });
+ r.json({ok:true,id:tx()})});
+app.post("/api/porosi/:id/shto",auth,(q,r)=>{
+ const o=order(q.params.id),p=db.prepare("SELECT * FROM products WHERE id=? AND active=1").get(Number(q.body.productId));
+ if(!o||o.status!=="ACTIVE"||!p)return r.status(400).json({error:"Porosia ose produkti nuk është aktiv."});
+ const createdAt=now();
+ const tx=db.transaction(()=>{
+   const i=db.prepare("INSERT INTO order_items(order_id,product_id,product_name_snapshot,unit_price_cents,quantity,created_at) VALUES(?,?,?,?,1,?)").run(o.id,p.id,p.name,p.price_cents,createdAt);
+   const s=total(o.id);
+   db.prepare("UPDATE orders SET total_cents=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(s,o.id);
+   event(o.id,"PRODUKT_U_SHTUA",{itemId:i.lastInsertRowid,produkt:p.name,quantity:1},q.session.user.id,createdAt);
+ });
+ tx();
+ r.json({ok:true})
+});
+app.patch("/api/porosi/:id/sasia",auth,(q,r)=>{
+ const o=order(q.params.id),rawQuantity=Number(q.body.quantity),n=Math.floor(rawQuantity);
+ const i=db.prepare("SELECT * FROM order_items WHERE id=? AND order_id=?").get(Number(q.body.itemId),q.params.id);
+ if(!o||o.status!=="ACTIVE"||!i||!Number.isFinite(rawQuantity)||rawQuantity!==n||n<0||n>999)return r.status(400).json({error:"Sasia nuk është e vlefshme."});
+ if(n===i.quantity)return r.json({ok:true});
+ if(n===0&&total(o.id)-i.quantity*i.unit_price_cents<=0)return r.status(400).json({error:"Porosia duhet të ketë të paktën një produkt."});
+ const changedAt=now();
+ const tx=db.transaction(()=>{
+   if(n===0)db.prepare("DELETE FROM order_items WHERE id=?").run(i.id);
+   else db.prepare("UPDATE order_items SET quantity=? WHERE id=?").run(n,i.id);
+   const s=total(o.id);
+   db.prepare("UPDATE orders SET total_cents=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(s,o.id);
+   event(o.id,n===0?"PRODUKT_U_HOQ":"PRODUKT_SASIA_NDRYSHUA",{itemId:i.id,produkt:i.product_name_snapshot,from:i.quantity,to:n},q.session.user.id,changedAt);
+ });
+ tx();
+ r.json({ok:true})
+});
 app.post("/api/porosi/:id/pagesa",auth,(q,r)=>{const o=order(q.params.id),m=String(q.body.method||"");if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});if(o.status==="PAID")return r.status(409).json({error:"Pagesa është regjistruar tashmë."});if(o.status==="CANCELLED")return r.status(400).json({error:"Porosia është anuluar."});if(!["ACTIVE","UNPAID"].includes(o.status))return r.status(400).json({error:"Kjo porosi nuk mund të paguhet."});if(!["CASH","CARD","OTHER"].includes(m))return r.status(400).json({error:"Zgjidhni mënyrën e pagesës."});const s=total(o.id);const tx=db.transaction(()=>{db.prepare("UPDATE orders SET status='PAID',total_cents=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,unpaid_at=NULL WHERE id=? AND status IN ('ACTIVE','UNPAID')").run(s,o.id);db.prepare("INSERT INTO payments(order_id,amount_cents,method,created_by) VALUES(?,?,?,?)").run(o.id,s,m,q.session.user.id);event(o.id,"PAGESA_U_PERFUND",""+m,q.session.user.id);audit(q.session.user.id,"PAGESA_PERFUND","ORDER",o.id,{method:m,total:s})});tx();r.json({ok:true})});
 app.post("/api/porosi/:id/mospagu",auth,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});if(o.status!=="ACTIVE")return r.status(400).json({error:"Vetëm porosia aktive mund të shënohet si e papaguar."});db.prepare("UPDATE orders SET status='UNPAID',unpaid_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='ACTIVE'").run(o.id);event(o.id,"NUK_U_PAGUA",{total:o.total_cents},q.session.user.id);audit(q.session.user.id,"NUK_U_PAGUA","ORDER",o.id,{total:o.total_cents});r.json({ok:true})});
 app.post("/api/porosi/:id/paguaj",admin,(q,r)=>{const o=order(q.params.id),m=String(q.body.method||"");if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});if(o.status!=="UNPAID")return r.status(400).json({error:"Porosia nuk është në listën e papaguara."});if(!["CASH","CARD","OTHER"].includes(m))return r.status(400).json({error:"Zgjidhni mënyrën e pagesës."});const s=total(o.id);const tx=db.transaction(()=>{db.prepare("UPDATE orders SET status='PAID',total_cents=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,unpaid_at=NULL WHERE id=? AND status='UNPAID'").run(s,o.id);db.prepare("INSERT INTO payments(order_id,amount_cents,method,created_by) VALUES(?,?,?,?)").run(o.id,s,m,q.session.user.id);event(o.id,"PAGESA_U_PERFUND_NGA_ADMIN",{method:m,total:s},q.session.user.id);audit(q.session.user.id,"PAGESA_U_PERFUND_NGA_ADMIN","ORDER",o.id,{method:m,total:s})});tx();r.json({ok:true})});
 app.post("/api/porosi/:id/anulo",admin,(q,r)=>{const o=order(q.params.id),reason=String(q.body.reason||"").trim();if(!o||o.status!=="ACTIVE")return r.status(400).json({error:"Porosia nuk është aktive."});if(!reason)return r.status(400).json({error:"Shkruani arsyen."});db.prepare("UPDATE orders SET status='CANCELLED',updated_at=CURRENT_TIMESTAMP WHERE id=?").run(o.id);event(o.id,"POROSI_E_ANULUAR",{arsye:reason},q.session.user.id);audit(q.session.user.id,"ANULO_POROSI","ORDER",o.id,{reason});r.json({ok:true})});
 app.get("/api/historiku",admin,(q,r)=>{const term=String(q.query.q||"").trim(),p=[];let s="SELECT o.*,t.number table_number,u.name waiter_name FROM orders o LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users u ON u.id=o.waiter_id WHERE o.status IN ('PAID','CANCELLED','UNPAID')";if(term){s+=" AND (CAST(o.order_number AS TEXT) LIKE ? OR CAST(t.number AS TEXT) LIKE ? OR COALESCE(o.custom_identifier,'') LIKE ?)";const z="%"+term+"%";p.push(z,z,z)}s+=" ORDER BY COALESCE(o.completed_at,o.unpaid_at,o.updated_at) DESC LIMIT 500";r.json(db.prepare(s).all(...p))});
-app.get("/api/historiku/:id",admin,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});r.json({...o,items:items(o.id),payments:db.prepare("SELECT * FROM payments WHERE order_id=?").all(o.id),events:db.prepare("SELECT e.*,u.name actor_name FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY e.created_at").all(o.id)})});
+app.get("/api/historiku/:id",admin,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});r.json({...o,items:items(o.id),payments:db.prepare("SELECT * FROM payments WHERE order_id=?").all(o.id),events:db.prepare("SELECT e.*,u.name actor_name FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY julianday(e.created_at),e.id").all(o.id)})});
 app.get("/api/statistika",admin,(q,r)=>{const t=db.prepare("SELECT COUNT(*) total,COALESCE(SUM(CASE WHEN status='PAID' THEN total_cents ELSE 0 END),0) revenue,COALESCE(SUM(CASE WHEN status='PAID' THEN 1 ELSE 0 END),0) paid,COALESCE(SUM(CASE WHEN status='CANCELLED' THEN 1 ELSE 0 END),0) cancelled FROM orders WHERE date(COALESCE(completed_at,unpaid_at,opened_at))=date('now','localtime')").get();const top=db.prepare("SELECT product_name_snapshot name,SUM(quantity) quantity FROM order_items i JOIN orders o ON o.id=i.order_id WHERE o.status='PAID' AND date(o.completed_at)=date('now','localtime') GROUP BY product_name_snapshot ORDER BY quantity DESC LIMIT 8").all();r.json({...t,revenue:eur(t.revenue),top})});
 app.get("/api/audit",admin,(q,r)=>r.json(db.prepare("SELECT a.*,u.name actor_name FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 500").all()));
 app.use((q,r)=>q.path.startsWith("/api/")?r.status(404).json({error:"Rruga nuk u gjet."}):r.sendFile(path.join(__dirname,"public","index.html")));
