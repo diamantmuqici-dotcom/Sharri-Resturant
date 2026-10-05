@@ -35,6 +35,7 @@ Baza krijohet automatikisht në data/sharri.db.
 - Çmimet ruhen në cent, shfaqen në euro: Hamburger 2.00€, Hamburger + Pomfrit 2.50€, Qebap (1 copë) 0.50€, Pjatë ushqimi 5.00€, Pica e madhe 4.00€, Pica familjare 7.00€, Pica e mesme 3.00€, Pica e vogel 2.00€.
 - Kategoria **Shtesa** mban shtesat me çmim të vetin: Suxhuk (1 copë) 1.00€, Pomfrit (1 porcion) 2.00€, Gjys pomfrit 1.50€, Qepë (1 copë) 1.00€, Spec i pjekur (1 copë) 0.50€, Extra djath 0.50€, Domat tranguj 1.00€. Shtesat nuk e bëjnë porosinë "komplet" dhe nuk numërohen si ushqim (porosi vetëm me shtesa nuk lejohet si "Me veti"/"Për këtu").
 - Birrat janë në kategorinë **Pije**: Birra Peje E vogel, Birra Peje E madhe (e njëjta foto për të dyja), Laqko (Laško), Bavaria, Ice Smirnof, Henikeni. Laqko nuk lidhet kurrë me foto torte.
+- Jägermeister (liker bimore, 35%) është në **Pije** me 2.50€ për porcion (1.00€–4.00€ është intervali i lejuar; për ta ndryshuar çmimin ndrysho `db.js` dhe ekzekuto `npm run seed`). Foto: `public/images/jagermeister.png`.
 - Fotot janë foto reale produkti/stock, të ruajtura lokalisht në `public/images` dhe lidhen në `public/app.js` (`productPhoto`). Nuk ka hotlink. Burimet: `public/images/ASSET-CREDITS.md`.
 
 ## Sinkronizimi i menusë në një bazë ekzistuese
