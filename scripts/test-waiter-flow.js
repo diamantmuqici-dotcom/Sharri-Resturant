@@ -213,6 +213,48 @@ async function main() {
     ok(rejectEmpty.status === 400 && afterRejectedRemoval.items.some(i => i.id === coffeeItem.id),
       "porosia e fundit nuk fshihet gabimisht kur tentohet heqja e artikullit të vetëm");
 
+    /* ---- shenimet e artikujve: "komplet" paguan çmimin normal, shtesa veç ------- */
+    const burger = byName("Hamburger"), suxhuk = byName("Suxhuk (1 copë)"), domat = byName("Domat tranguj");
+    ok(burger && burger.price_cents === 200 && suxhuk && suxhuk.price_cents === 100 && domat && domat.price_cents === 100,
+      "shtesat janë në menu me çmimet e tyre (suxhuk 1.00€, domat tranguj 1.00€)");
+
+    const noteOrderResponse = await fetch(BASE + "/api/porosi", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ orderType: "TAVOLINE", tableNumber: 9, items: [{ productId: burger.id, quantity: 1, notes: "Komplet me majonez" }] }),
+    });
+    const noteOrderBody = await noteOrderResponse.json();
+    const noteOrder = await jget("/api/porosi/" + noteOrderBody.id);
+    ok(noteOrderResponse.ok && noteOrder.items[0].notes === "Komplet me majonez" && noteOrder.total_cents === 200,
+      'porosi "komplet me majonez" ruan shenimin dhe hamburgeri mbetet 2.00€ (çmim normal)',
+      noteOrder && (noteOrder.total_cents / 100).toFixed(2) + "\u20ac");
+
+    const addSuxhuk = await fetch(BASE + "/api/porosi/" + noteOrderBody.id + "/shto", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ productId: suxhuk.id, notes: "Pa qepë" }),
+    });
+    const withExtra = await jget("/api/porosi/" + noteOrderBody.id);
+    const suxhukItem = withExtra.items.find(i => i.product_name_snapshot === suxhuk.name);
+    ok(addSuxhuk.ok && suxhukItem && suxhukItem.notes === "Pa qepë" && withExtra.total_cents === 300,
+      "shtesa e shtuar veç pagesë ekstra rrit totalin në 3.00€ dhe mban shenimin e vet");
+
+    const renameNote = await fetch(BASE + "/api/porosi/" + noteOrderBody.id + "/shenim", {
+      method: "PATCH", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ itemId: suxhukItem.id, notes: "Ekstra i pjekur" }),
+    });
+    const afterNote = await jget("/api/porosi/" + noteOrderBody.id);
+    const noteEvent = afterNote.events.find(e => e.event_type === "SHENIM_U_NDRYSHUA");
+    ok(renameNote.ok && afterNote.items.find(i => i.id === suxhukItem.id).notes === "Ekstra i pjekur" && noteEvent &&
+      JSON.parse(noteEvent.details).from === "Pa qepë" && JSON.parse(noteEvent.details).to === "Ekstra i pjekur",
+      "ndryshimi i shenimit ruhet në kronologjinë e porosisë me vlerën e vjetër dhe të renë");
+
+    const clearNote = await fetch(BASE + "/api/porosi/" + noteOrderBody.id + "/shenim", {
+      method: "PATCH", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ itemId: suxhukItem.id, notes: "" }),
+    });
+    const afterClear = await jget("/api/porosi/" + noteOrderBody.id);
+    ok(clearNote.ok && !afterClear.items.find(i => i.id === suxhukItem.id).notes && afterClear.total_cents === 300,
+      "heqja e shenimit nuk ndryshon çmimin dhe porosia mbetet e plotë");
+
     const adminLogin = await fetch(BASE + "/api/kycu", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: "admin", password: "admin" }),
@@ -222,6 +264,11 @@ async function main() {
     const historyDetail = await historyDetailResponse.json();
     ok(historyDetailResponse.ok && historyDetail.items[0].created_at === coffeeItem.created_at && historyDetail.events.some(e => e.event_type === "PRODUKT_U_SHTUA"),
       "administrata sheh të njëjtat orë artikujsh dhe ndryshimesh në historikun e porosisë");
+    const noteHistoryResponse = await fetch(BASE + "/api/historiku/" + noteOrderBody.id, { headers: { Cookie: adminCookie } });
+    const noteHistory = await noteHistoryResponse.json();
+    ok(noteHistoryResponse.ok && noteHistory.items.some(i => i.notes === "Komplet me majonez") &&
+      noteHistory.events.some(e => e.event_type === "SHENIM_U_NDRYSHUA"),
+      "administrata sheh shenimet e artikujve dhe historikun e shenimeve");
   } finally {
     stop();
   }

@@ -16,6 +16,7 @@ Ndërfaqja është vetëm në shqip/Kosovo Albanian.
 - Tavolina e njëjtë nuk mund të ketë dy porosi aktive normale.
 - Pagesa regjistrohet vetëm një herë dhe ruhet me kohë, kamarier dhe mënyrë pagese.
 - Çdo produkt ruan kohën kur u regjistrua; shtimet, ndryshimet e sasisë dhe heqjet ruhen në kronologjinë e porosisë bashkë me kamarierin.
+- Çdo artikull mund të ketë **shenim** (p.sh. “Komplet me majonez”, “Pa qepë”, “Pa tranguj”). Shenimi nuk e ndryshon çmimin: porosia **komplet** mbetet me çmimin normal të produktit, ndërsa shtesat e porositura veç (Suxhuk, Pomfrit, Extra djath...) paguhen ekstra. Shenimi shfaqet te porosia aktive dhe te historiku, dhe ndryshimi i tij ruhet në kronologji.
 - Këto orë shfaqen te porosia aktive dhe te detajet e porosisë në historikun e administratës, për krahasim me kamerat.
 - Çdo veprim i rëndësishëm ruhet në gjurmët e sistemit.
 
@@ -31,7 +32,8 @@ Kërkohet Node.js 20+.
 Baza krijohet automatikisht në data/sharri.db.
 
 ## Menuja dhe fotot
-- Çmimet ruhen në cent, shfaqen në euro: Hamburger 2.00€, Hamburger + Pomfrit 2.50€, Qebap (1 copë) 0.50€, Pica e madhe 4.00€, Pica familjare 7.00€, Pica e mesme 3.00€, Pica e vogel 2.00€.
+- Çmimet ruhen në cent, shfaqen në euro: Hamburger 2.00€, Hamburger + Pomfrit 2.50€, Qebap (1 copë) 0.50€, Pjatë ushqimi 5.00€, Pica e madhe 4.00€, Pica familjare 7.00€, Pica e mesme 3.00€, Pica e vogel 2.00€.
+- Kategoria **Shtesa** mban shtesat me çmim të vetin: Suxhuk (1 copë) 1.00€, Pomfrit (1 porcion) 2.00€, Gjys pomfrit 1.50€, Qepë (1 copë) 1.00€, Spec i pjekur (1 copë) 0.50€, Extra djath 0.50€, Domat tranguj 1.00€. Shtesat nuk e bëjnë porosinë "komplet" dhe nuk numërohen si ushqim (porosi vetëm me shtesa nuk lejohet si "Me veti"/"Për këtu").
 - Birrat janë në kategorinë **Pije**: Birra Peje E vogel, Birra Peje E madhe (e njëjta foto për të dyja), Laqko (Laško), Bavaria, Ice Smirnof, Henikeni. Laqko nuk lidhet kurrë me foto torte.
 - Fotot janë foto reale produkti/stock, të ruajtura lokalisht në `public/images` dhe lidhen në `public/app.js` (`productPhoto`). Nuk ka hotlink. Burimet: `public/images/ASSET-CREDITS.md`.
 
@@ -65,6 +67,6 @@ Lokalisht:
 
     npm test
 
-Kontrolli përfshin: sintaksën (`node --check` për `server.js`, `db.js`, `public/app.js`), menunë dhe çmimet në bazë, mapimin e fotove në frontend, migrimin e një baze ekzistuese pa prekur porositë/pagesat, dhe rrjedhën e kamarierit në "POROSI E RE" (fotot nën *Pije* dhe *Mish dhe Ushqim*, për porosi të re dhe aktive).
+Kontrolli përfshin: sintaksën (`node --check` për `server.js`, `db.js`, `public/app.js`), menunë dhe çmimet në bazë (përfshirë *Shtesa* dhe *Pjatë ushqimi*), mapimin e fotove në frontend, migrimin e një baze ekzistuese pa prekur porositë/pagesat, dhe rrjedhën e kamarierit në "POROSI E RE" (fotot nën *Pije* dhe *Mish dhe Ushqim*, për porosi të re dhe aktive, si dhe shenimet e artikujve: “komplet” mbetet çmim normal, shtesa veç, ndryshimi i shenimit në kronologji).
 
 Shënim: `better-sqlite3` kompilohet në instalim. Përdor Node 22 (p.sh. me `fnm use 22`); Node 26+ nuk e kompilon versionin 11.x.
