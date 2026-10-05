@@ -38,12 +38,24 @@ function extractFunction(src, name) {
 }
 const runSeed = cwd => execFileSync(process.execPath, ["db.js"], { cwd, stdio: "pipe" }).toString();
 const imageExists = src => !!src && fs.existsSync(path.join(ROOT, "public", src.replace(/^\//, "")));
-const imageBytes = src => fs.statSync(path.join(ROOT, "public", src.replace(/^\//, ""))).size;
+/* a bundled photo must be a real raster file of a sane size; dimensions are
+   checked only when ImageMagick is available (optional), so the test works on a
+   plain Node setup too */
+let identifyMissing = false;
 const isPhoto = src => {
   const f = path.join(IMAGES, path.basename(src));
-  if (!fs.existsSync(f)) return false;
-  const out = execFileSync("identify", ["-format", "%wx%h", f], { stdio: "pipe" }).toString().split("x");
-  return Math.min(+out[0], +out[1]) >= 200 && fs.statSync(f).size > 5000;
+  if (!fs.existsSync(f) || !/^\.(jpe?g|png)$/i.test(path.extname(f))) return false;
+  const head = fs.readFileSync(f).subarray(0, 4);
+  const jpeg = head[0] === 0xff && head[1] === 0xd8;
+  const png = head[0] === 0x89 && head[1] === 0x50;
+  if (!(jpeg || png) || fs.statSync(f).size <= 5000) return false;
+  if (!identifyMissing) {
+    try {
+      const [w, h] = execFileSync("identify", ["-format", "%wx%h", f], { stdio: "pipe" }).toString().split("x");
+      if (Math.min(+w, +h) < 200) return false;
+    } catch (e) { identifyMissing = true; }
+  }
+  return true;
 };
 
 /* -------------------------------------------------- expected menu (EUR) */
