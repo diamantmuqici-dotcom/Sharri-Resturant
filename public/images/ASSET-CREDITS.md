@@ -28,6 +28,7 @@ All four beers live in the **Pije** category. `birra-peja.jpg` is reused for bot
 | `bavaria.jpg` | Bavaria | [Bavaria bottle & glass product image](https://www.alibaba.com/showroom/bavaria-beer-price.html) |
 | `smirnoff-ice.jpg` | Ice Smirnof | [Kroger, Smirnoff Ice Original](https://www.kroger.com/p/smirnoff-ice-original-flavored-hard-beverage-single-bottle/0008200072384) |
 | `heineken.jpg` | Henikeni | [Ocado, Heineken Lager bottles](https://zoom.ocado.com/heineken-lager-beer-bottles-4-x-330ml) |
+| `jagermeister.png` | Jagermeister | [Target, Jägermeister 375 ml bottle packshot](https://www.target.com/p/jagermeister-liqueur-375ml-bottle/-/A-52563355); background removed locally with ImageMagick into a transparent PNG. Brand-owned product image — same rights note as the other packshots above. |
 
 ## Food
 

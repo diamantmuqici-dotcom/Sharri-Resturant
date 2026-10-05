@@ -75,6 +75,7 @@ const EXPECTED = [
   ["Laqin",               "Pije",               50, "PIJE"],
   ["Birra Peje E vogel",  "Pije",              100, "PIJE"],
   ["Birra Peje E madhe",  "Pije",              100, "PIJE"],
+  ["Jagermeister",        "Pije",              250, "PIJE"],   // €2.50 / porcion (intervali 1.00€–4.00€)
   ["Trileqe",             "Ëmbëlsira",         150, "EMBELSIRE"],
   ["Torte Snikers",       "Ëmbëlsira",         150, "EMBELSIRE"],
 ];
@@ -136,6 +137,10 @@ ok(srcOf("Laqko", "EMBELSIRE", "Ëmbëlsira") === "/images/lasko.jpg", "Laqko me
 ok(srcOf("Laqko", "PIJE", "Të tjera") === "/images/lasko.jpg", "Laqko me kategori të vjetër 'Të tjera' nuk bie në foto torte");
 ok(srcOf("Ice Smirnof", "PIJE", "Pije") === "/images/smirnoff-ice.jpg", "Ice Smirnof → smirnoff-ice.jpg");
 ok(srcOf("Henikeni", "PIJE", "Pije") === "/images/heineken.jpg", "Henikeni → heineken.jpg");
+ok(srcOf("Jagermeister", "PIJE", "Pije") === "/images/jagermeister.png", "Jagermeister → jagermeister.png (shishja e likerit)");
+ok(srcOf("Jägermeister", "PIJE", "Pije") === "/images/jagermeister.png", "Jägermeister me umlaut → e njëjta foto");
+ok(srcOf("Jagermeister", "PIJE", "Pije") !== "/images/juice.jpg", "Jagermeister nuk bie në foton e përgjithshme të pijeve");
+ok(isPhoto("/images/jagermeister.png"), "fotoja e Jagermeister është PNG real me transparencë");
 ok(srcOf("Bavaria", "PIJE", "Pije") === "/images/bavaria.jpg", "Bavaria → bavaria.jpg");
 for (const b of BEERS) {
   ok(srcOf(b, "PIJE", "Të tjera") === srcOf(b, "PIJE", "Pije"), `"${b}" ka foto edhe kur kategoria e vjetër është e gabuar`);
