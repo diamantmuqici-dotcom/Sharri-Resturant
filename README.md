@@ -15,6 +15,8 @@ Ndërfaqja është vetëm në shqip/Kosovo Albanian.
 - Porosi vetëm me pije/kafe duhet të lidhet me tavolinë ose emër.
 - Tavolina e njëjtë nuk mund të ketë dy porosi aktive normale.
 - Pagesa regjistrohet vetëm një herë dhe ruhet me kohë, kamarier dhe mënyrë pagese.
+- Çdo produkt ruan kohën kur u regjistrua; shtimet, ndryshimet e sasisë dhe heqjet ruhen në kronologjinë e porosisë bashkë me kamarierin.
+- Këto orë shfaqen te porosia aktive dhe te detajet e porosisë në historikun e administratës, për krahasim me kamerat.
 - Çdo veprim i rëndësishëm ruhet në gjurmët e sistemit.
 
 ## Nisja
