@@ -36,6 +36,7 @@ Baza krijohet automatikisht në data/sharri.db.
 - **Hamburger + Mish i Bardh** (2.50€) është burger me mish të bardhë, në kategorinë *Mish dhe Ushqim*, me foto të vet: `public/images/burger-mish-i-bardh.jpg`. Produktet e tjera me mish të bardhë nuk preken: Pule, File Pule dhe Gjys Pule mbeten me foton e mishit të pjekur, ndërsa Mish i Bardh i thjeshtë mbetet me foton e pjatës.
 - Kategoria **Shtesa** mban shtesat me çmim të vetin: Suxhuk (1 copë) 1.00€, Pomfrit (1 porcion) 2.00€, Gjys pomfrit 1.50€, Qepë (1 copë) 1.00€, Spec i pjekur (1 copë) 0.50€, Extra djath 0.50€, Domat tranguj 1.00€. Shtesat nuk e bëjnë porosinë "komplet" dhe nuk numërohen si ushqim (porosi vetëm me shtesa nuk lejohet si "Me veti"/"Për këtu").
 - Birrat janë në kategorinë **Pije**: Birra Peje E vogel, Birra Peje E madhe (e njëjta foto për të dyja), Laqko (Laško), Bavaria, Ice Smirnof, Henikeni. Laqko nuk lidhet kurrë me foto torte.
+- Multisola dhe Ice Tea janë në kategorinë **Pije**, me çmim 1.00€ secila.
 - Jägermeister (liker bimore, 35%) është në **Pije** me 2.50€ për porcion (1.00€–4.00€ është intervali i lejuar; për ta ndryshuar çmimin ndrysho `db.js` dhe ekzekuto `npm run seed`). Foto: `public/images/jagermeister.png`.
 - Fotot janë foto reale produkti/stock, të ruajtura lokalisht në `public/images` dhe lidhen në `public/app.js` (`productPhoto`). Nuk ka hotlink. Burimet: `public/images/ASSET-CREDITS.md`.
 
