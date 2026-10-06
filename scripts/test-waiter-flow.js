@@ -81,6 +81,7 @@ async function main() {
     ok(!menu.categories.some(c => c.name === "Të tjera"), "kategoria 'Të tjera' nuk shfaqet më në menu");
     const PRICES = [
       ["Hamburger", 200, "Mish dhe Ushqim"], ["Hamburger + Pomfrit", 250, "Mish dhe Ushqim"],
+      ["Hamburger + Mish i Bardh", 250, "Mish dhe Ushqim"],
       ["Qebap (1 copë)", 50, "Mish dhe Ushqim"], ["Pica E madhe", 400, "Mish dhe Ushqim"],
       ["Pica Familjare", 700, "Mish dhe Ushqim"], ["Pica E mesme", 300, "Mish dhe Ushqim"],
       ["Pica E vogel", 200, "Mish dhe Ushqim"], ["Ice Smirnof", 150, "Pije"], ["Henikeni", 150, "Pije"],
@@ -120,6 +121,9 @@ async function main() {
       return (new RegExp('^<button class="product[^"]*"[^>]*><img[^>]*src="([^"]+)"', "m").exec(productCard(p, "x")) || [])[1] || "";
     };
 
+    ok(srcOfProduct("Hamburger + Mish i Bardh") === "/images/burger-mish-i-bardh.jpg",
+      "'Hamburger + Mish i Bardh' shfaq burgerin me mish të bardhë");
+    ok(srcOfProduct("Hamburger") === "/images/burger-sandwich.jpg", "Hamburger mbetet me foton e vet");
     ok(srcOfProduct("Laqko") === "/images/lasko.jpg", "Laqko shfaq lasko.jpg (birrë), jo tortë");
     ok(srcOfProduct("Laqin") === "/images/laqin.png", "Laqin shfaq foton e produktit");
     ok(srcOfProduct("Ujë Mokne") === "/images/uje-mokne.png", "Ujë Mokne shfaq foton e shishes");

@@ -63,6 +63,7 @@ const EXPECTED = [
   // name,               category,            priceCents, kind
   ["Hamburger",           "Mish dhe Ushqim",   200, "USHQIM"],   // €2.00
   ["Hamburger + Pomfrit", "Mish dhe Ushqim",   250, "USHQIM"],   // €2.50
+  ["Hamburger + Mish i Bardh", "Mish dhe Ushqim", 250, "USHQIM"],// €2.50 (mish i bardhë)
   ["Qebap (1 copë)",      "Mish dhe Ushqim",    50, "USHQIM"],   // €0.50 / piece
   ["Pica e madhe",        "Mish dhe Ushqim",   400, "USHQIM"],   // €4.00
   ["Pica familjare",      "Mish dhe Ushqim",   700, "USHQIM"],   // €7.00
@@ -153,6 +154,12 @@ ok(srcOf("Torte Snikers", "EMBELSIRE", "Ëmbëlsira") === "/images/snickers-cake
 ok(srcOf("Qebap (1 copë)", "USHQIM", "Mish dhe Ushqim") === "/images/qebap.jpg", "Qebap (1 copë) → qebap.jpg");
 ok(srcOf("Hamburger", "USHQIM", "Mish dhe Ushqim") === "/images/burger-sandwich.jpg", "Hamburger → burger-sandwich.jpg");
 ok(srcOf("Hamburger + Pomfrit", "USHQIM", "Mish dhe Ushqim") === "/images/burger-sandwich.jpg", "Hamburger + Pomfrit → burger-sandwich.jpg");
+ok(srcOf("Hamburger + Mish i Bardh", "USHQIM", "Mish dhe Ushqim") === "/images/burger-mish-i-bardh.jpg", "Hamburger + Mish i Bardh → burger-mish-i-bardh.jpg");
+ok(srcOf("Hamburger + Mish i Bardh", "USHQIM", "Mish dhe Ushqim") !== "/images/burger-sandwich.jpg", "Hamburger + Mish i Bardh ka foto të vet (jo e njëjta si Hamburger)");
+ok(isPhoto("/images/burger-mish-i-bardh.jpg"), "fotoja e Hamburger + Mish i Bardh është foto reale burgeri");
+ok(srcOf("Mish i Bardh", "USHQIM", "Mish dhe Ushqim") === "/images/grill-platter.jpg", "Mish i Bardh i thjeshtë mbetet me foton e vet të pjatës (jo burger)");
+ok(!["/images/burger-mish-i-bardh.jpg", "/images/burger-sandwich.jpg"].includes(srcOf("Mish i Bardh", "USHQIM", "Mish dhe Ushqim")), "Mish i Bardh i thjeshtë nuk merr asnjë foto burgeri");
+ok(srcOf("Pule", "USHQIM", "Mish dhe Ushqim") === "/images/grilled-chicken.jpg", "Pule mbetet me foton e mishit të pjekur");
 ok(["/images/lasko.jpg", "/images/birra-peja.jpg", "/images/bavaria.jpg", "/images/smirnoff-ice.jpg", "/images/heineken.jpg", "/images/qebap.jpg"].every(isPhoto), "fotot e pijeve/qebapit janë foto reale (jo placeholder)");
 ok(!/(placehold\.|via\.placeholder|\.svg|picsum|unsplash\.it)/i.test(appJs), "frontend-i nuk përdor placeholder ose hotlink");
 
@@ -172,6 +179,9 @@ tdb.prepare("UPDATE products SET name='Qebapa' WHERE name='Qebap (1 copë)'").ru
 tdb.prepare("UPDATE products SET category_id=?,price_cents=999 WHERE name='Laqko'").run(emb);
 tdb.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)").run(emb, "Birra Peje E vogel", 100, "PIJE", 99);
 tdb.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)").run(pije, "Hamburger", 185, "USHQIM", 98);
+// an older database that does not know the new product yet
+tdb.prepare("DELETE FROM products WHERE name='Hamburger + Mish i Bardh'").run();
+ok(!tdb.prepare("SELECT COUNT(*) n FROM products WHERE name='Hamburger + Mish i Bardh'").get().n, "baza e vjetër nuk e ka 'Hamburger + Mish i Bardh' para sinkronizimit");
 // a real order + item + payment that must survive the reseed
 const waiter = tdb.prepare("SELECT id FROM users LIMIT 1").get().id;
 tdb.prepare("INSERT INTO orders(order_number,order_type,waiter_id,status,total_cents) VALUES(998,'PER_KETU',?,'PAID',150)").run(waiter);
@@ -200,6 +210,9 @@ ok(pejeRows.filter(r => r.active === 1).length === 1, "dublikati i Pejës u ngec
 ok(pejeRows.filter(r => r.active === 1).every(r => r.category_name === "Pije"), "Peja e vogël mbeti në 'Pije'");
 const burgers = q("Hamburger").filter(r => r.active === 1);
 ok(burgers.length === 1 && burgers[0].price_cents === 200, "Hamburger u krijua me 2.00€ dhe nuk u dublo", JSON.stringify(burgers));
+const mishBurger = q("Hamburger + Mish i Bardh").filter(r => r.active === 1);
+ok(mishBurger.length === 1 && mishBurger[0].price_cents === 250 && mishBurger[0].category_name === "Mish dhe Ushqim",
+  "produkti i re 'Hamburger + Mish i Bardh' u shtua një herë me 2.50€ nën 'Mish dhe Ushqim'", JSON.stringify(mishBurger));
 const after = {
   orders: tdb2.prepare("SELECT COUNT(*) n FROM orders").get().n,
   items: tdb2.prepare("SELECT COUNT(*) n FROM order_items").get().n,
