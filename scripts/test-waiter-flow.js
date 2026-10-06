@@ -85,7 +85,7 @@ async function main() {
       ["Qebap (1 copë)", 50, "Mish dhe Ushqim"], ["Pica E madhe", 400, "Mish dhe Ushqim"],
       ["Pica Familjare", 700, "Mish dhe Ushqim"], ["Pica E mesme", 300, "Mish dhe Ushqim"],
       ["Pica E vogel", 200, "Mish dhe Ushqim"], ["Ice Smirnof", 150, "Pije"], ["Henikeni", 150, "Pije"],
-      ["Bavaria", 150, "Pije"], ["Laqko", 150, "Pije"], ["Jagermeister", 250, "Pije"],
+      ["Bavaria", 150, "Pije"], ["Laqko", 150, "Pije"], ["Jagermeister", 150, "Pije"],
       ["Multisola", 100, "Pije"], ["Ice Tea", 100, "Pije"],
     ];
     for (const [n, cents, cat] of PRICES)
@@ -127,6 +127,8 @@ async function main() {
     ok(srcOfProduct("Hamburger") === "/images/burger-sandwich.jpg", "Hamburger mbetet me foton e vet");
     ok(srcOfProduct("Laqko") === "/images/lasko.jpg", "Laqko shfaq lasko.jpg (birrë), jo tortë");
     ok(srcOfProduct("Laqin") === "/images/laqin.png", "Laqin shfaq foton e produktit");
+    ok(srcOfProduct("Multisola") === "/images/multisola.jpg", "Multisola shfaq fotografinë e vet");
+    ok(srcOfProduct("Ice Tea") === "/images/ice-tea.png", "Ice Tea shfaq fotografinë e vet");
     ok(srcOfProduct("Ujë Mokne") === "/images/uje-mokne.png", "Ujë Mokne shfaq foton e shishes");
     ok(srcOfProduct("Schweeps") === "/images/schwepps.png", "Schweeps shfaq foton e produktit");
     ok(srcOfProduct("Ice Smirnof") === "/images/smirnoff-ice.jpg", "Ice Smirnof shfaq smirnoff-ice.jpg");

@@ -21,6 +21,15 @@ Ndërfaqja është vetëm në shqip/Kosovo Albanian.
 - Çdo veprim i rëndësishëm ruhet në gjurmët e sistemit.
 - Kamarieri mund të kërkojë anulimin e porosisë vetëm duke dhënë arsye. Porosia nuk largohet nga porositë aktive dhe pagesa/redaktimi bllokohen derisa administratori ta pranojë ose refuzojë kërkesën. Pranimi e shënon porosinë të anuluar dhe e ruan atë, arsyen dhe vendimin në historik; refuzimi e lë porosinë aktive.
 
+## Shtesat e POS-it
+- **Kuzhina:** ekrani KUZHINA mbledh porositë me ushqim/ëmbëlsirë, tregon shënimet dhe lejon kalimin nga E re në Në përgatitje e Gati. Rifreskohet automatikisht.
+- **Faturat:** porositë mund të shtypen nga shfletuesi në format termik 58 mm ose 80 mm.
+- **Raportet:** administrata filtron shitjet sipas datave (përfshirë sot/këtë muaj), sheh të hyrat, pagesat sipas mënyrës, bestsellerët dhe porositë e papaguara/anuluara; raportet e porosive shkarkohen si CSV.
+- **Redaktimi i menusë:** administrata mund të ndryshojë emrin, çmimin, kategorinë, renditjen, foton dhe disponueshmërinë. Fotot e ngarkuara ruhen te `data/menu-images/`.
+- **Tavolinat:** paneli i kamarierit ka hartë vizuale të të 50 tavolinave, me gjendjen e lirë/zënë dhe shumën për tavolinat aktive.
+- **Stoku:** produktet e zgjedhura mund të ndiqen në inventar; shitjet e ulin stokun automatikisht, anulimet e miratuara e kthejnë, dhe admini sheh pragjet e stokut të ulët.
+- **Menuja QR:** menu publike, e përshtatshme për telefon, gjendet te `/menu`. Te administrata → QR Menu shkarkohet kodi QR për tavolinat. Në instalim publik vendos `PUBLIC_BASE_URL` në adresën HTTPS të restorantit që kodi të çojë në domenin e saktë.
+
 ## Nisja
 Kërkohet Node.js 20+.
 
@@ -36,9 +45,9 @@ Baza krijohet automatikisht në data/sharri.db.
 - Çmimet ruhen në cent, shfaqen në euro: Hamburger 2.00€, Hamburger + Pomfrit 2.50€, Hamburger + Mish i Bardh 2.50€, Qebap (1 copë) 0.50€, Pjatë ushqimi 5.00€, Pica e madhe 4.00€, Pica familjare 7.00€, Pica e mesme 3.00€, Pica e vogel 2.00€.
 - **Hamburger + Mish i Bardh** (2.50€) është burger me mish të bardhë, në kategorinë *Mish dhe Ushqim*, me foto të vet: `public/images/burger-mish-i-bardh.jpg`. Produktet e tjera me mish të bardhë nuk preken: Pule, File Pule dhe Gjys Pule mbeten me foton e mishit të pjekur, ndërsa Mish i Bardh i thjeshtë mbetet me foton e pjatës.
 - Kategoria **Shtesa** mban shtesat me çmim të vetin: Suxhuk (1 copë) 1.00€, Pomfrit (1 porcion) 2.00€, Gjys pomfrit 1.50€, Qepë (1 copë) 1.00€, Spec i pjekur (1 copë) 0.50€, Extra djath 0.50€, Domat tranguj 1.00€. Shtesat nuk e bëjnë porosinë "komplet" dhe nuk numërohen si ushqim (porosi vetëm me shtesa nuk lejohet si "Me veti"/"Për këtu").
-- Birrat janë në kategorinë **Pije**: Birra Peje E vogel, Birra Peje E madhe (e njëjta foto për të dyja), Laqko (Laško), Bavaria, Ice Smirnof, Henikeni. Laqko nuk lidhet kurrë me foto torte.
-- Multisola dhe Ice Tea janë në kategorinë **Pije**, me çmim 1.00€ secila.
-- Jägermeister (liker bimore, 35%) është në **Pije** me 2.50€ për porcion (1.00€–4.00€ është intervali i lejuar; për ta ndryshuar çmimin ndrysho `db.js` dhe ekzekuto `npm run seed`). Foto: `public/images/jagermeister.png`.
+- Birrat janë në kategorinë **Pije**: Birra Peje, Laqko (Laško), Bavaria, Ice Smirnof, Henikeni. Laqko nuk lidhet kurrë me foto torte.
+- Multisola dhe Ice Tea janë në kategorinë **Pije**, me çmim 1.00€ secila dhe me fotografi të veçantë (`public/images/multisola.jpg` dhe `public/images/ice-tea.png`).
+- Jägermeister (liker bimore, 35%) është në **Pije** me 1.50€ për porcion. Për ta ndryshuar çmimin, ndrysho `db.js` dhe ekzekuto `npm run seed`. Foto: `public/images/jagermeister.png`.
 - Fotot janë foto reale produkti/stock, të ruajtura lokalisht në `public/images` dhe lidhen në `public/app.js` (`productPhoto`). Nuk ka hotlink. Burimet: `public/images/ASSET-CREDITS.md`.
 
 ## Sinkronizimi i menusë në një bazë ekzistuese
@@ -71,6 +80,6 @@ Lokalisht:
 
     npm test
 
-Kontrolli përfshin: sintaksën (`node --check` për `server.js`, `db.js`, `public/app.js`), menunë dhe çmimet në bazë (përfshirë *Shtesa*, *Pjatë ushqimi* dhe *Hamburger + Mish i Bardh*), mapimin e fotove në frontend (burgeri me mish të bardhë ka foto të vet, mishi i bardhë i thjeshtë mbetet me foton e mishit të pjekur), migrimin e një baze ekzistuese pa prekur porositë/pagesat (edhe shtimin e produktit të re në një bazë të vjetër), dhe rrjedhën e kamarierit në "POROSI E RE" (fotot nën *Pije* dhe *Mish dhe Ushqim*, për porosi të re dhe aktive, shenimet e artikujve, si dhe kërkesën për anulim me arsye, miratimin/refuzimin nga administratori dhe ruajtjen në historik).
+Kontrolli përfshin sintaksën, menunë/fotot dhe migrimin pa humbur historik, rrjedhën e kamarierit dhe anulimet, si dhe testet fund-më-fund për kuzhinën, faturat termike, raportet/CSV, redaktimin e menusë dhe ngarkimin e fotografive, hartën e 50 tavolinave, stokun dhe menynë/kodin QR publik.
 
 Shënim: `better-sqlite3` kompilohet në instalim. Përdor Node 22 (p.sh. me `fnm use 22`); Node 26+ nuk e kompilon versionin 11.x.

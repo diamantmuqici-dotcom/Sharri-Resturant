@@ -1,9 +1,23 @@
 {
-  "name":"sharri-restaurant-pos",
-  "version":"1.0.0",
-  "private":true,
-  "main":"server.js",
-  "scripts":{"start":"node server.js","dev":"node --watch server.js","seed":"node db.js","test":"node --check server.js && node --check db.js && node --check public/app.js && node scripts/test-menu.js && node scripts/test-waiter-flow.js"},
-  "engines":{"node":">=20"},
-  "dependencies":{"bcryptjs":"^3.0.2","better-sqlite3":"^11.8.1","dotenv":"^16.4.7","express":"^5.1.0","express-session":"^1.18.1"}
+  "name": "sharri-restaurant-pos",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node db.js",
+    "test": "node --check server.js && node --check db.js && node --check public/app.js && node --check public/qr-menu.js && node scripts/test-menu.js && node scripts/test-waiter-flow.js && node scripts/test-upgrades.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "express-session": "^1.18.1",
+    "qrcode": "^1.5.4"
+  }
 }

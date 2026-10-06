@@ -11,6 +11,8 @@ All menu images are ordinary product/stock photography (not AI-generated) and ar
 | `schwepps.png` | Schweeps | [Schweppes product listing](https://amazon.com/clp/B00H3T1CUS), cut out from the bundled `schwepps.jpg` source. |
 | `red-bull.jpg` | RedBull | [Red Bull product photo](https://howtomarkettome.com/original-red-bull-can) |
 | `golden-eagle.jpg` | Golden Eagle | [AlbProducts, Golden Eagle Energy Drink](https://albproducts.com/products/golden-eagle-energy-drink) |
+| `multisola.jpg` | Multisola / Multi Sola | [Open Food Facts, Multi Sola](https://world.openfoodfacts.org/product/3838999051225/multi-sola) (product-front photo; resized locally for the menu). |
+| `ice-tea.png` | Ice Tea (peach) | [Frutti Kosovo, Ice Tea](https://frutti-ks.com/en/ice-tea/) (official transparent product image). |
 | `laqin.png` | Laqin / Lacin bottled drink | Cropped transparent cutout from the existing local product image (`juice.jpg`). |
 | `uje-mokne.png` | Ujë Mokne 0.33L | [Mokne official product image](https://mokne.com/wp-content/uploads/2024/05/product-0-33-2.png) |
 | `juice.jpg` | Legacy drink fallback (bottle label reads Lacin) | Bundled with the earlier menu photo set. |
@@ -23,7 +25,7 @@ All four beers live in the **Pije** category. `birra-peja.jpg` is reused for bot
 
 | File | Product | Source |
 | --- | --- | --- |
-| `birra-peja.jpg` | Birra Peje E vogel / Birra Peje E madhe | [BeerTasting, Peja Pilsner](https://www.beertasting.com/en/beers/peja-pilsner) |
+| `birra-peja.jpg` | Birra Peje (also used for legacy size aliases) | [BeerTasting, Peja Pilsner](https://www.beertasting.com/en/beers/peja-pilsner) |
 | `lasko.jpg` | Laqko (Laško) | [Crafted by PES, Laško Zlatorog bottle](https://craftedbypes.com/bottle-opener-ideas) |
 | `bavaria.jpg` | Bavaria | [Bavaria bottle & glass product image](https://www.alibaba.com/showroom/bavaria-beer-price.html) |
 | `smirnoff-ice.jpg` | Ice Smirnof | [Kroger, Smirnoff Ice Original](https://www.kroger.com/p/smirnoff-ice-original-flavored-hard-beverage-single-bottle/0008200072384) |

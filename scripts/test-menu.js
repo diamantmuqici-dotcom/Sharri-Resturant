@@ -76,13 +76,12 @@ const EXPECTED = [
   ["Bavaria",             "Pije",              150, "PIJE"],
   ["Laqko",               "Pije",              150, "PIJE"],
   ["Laqin",               "Pije",               50, "PIJE"],
-  ["Birra Peje E vogel",  "Pije",              100, "PIJE"],
-  ["Birra Peje E madhe",  "Pije",              100, "PIJE"],
-  ["Jagermeister",        "Pije",              250, "PIJE"],   // €2.50 / porcion (intervali 1.00€–4.00€)
+  ["Birra Peje",          "Pije",              100, "PIJE"],
+  ["Jagermeister",        "Pije",              150, "PIJE"],   // €1.50 / porcion
   ["Trileqe",             "Ëmbëlsira",         150, "EMBELSIRE"],
   ["Torte Snikers",       "Ëmbëlsira",         150, "EMBELSIRE"],
 ];
-const BEERS = ["Ice Smirnof", "Henikeni", "Bavaria", "Laqko"];
+const BEERS = ["Ice Smirnof", "Henikeni", "Bavaria", "Laqko", "Birra Peje"];
 
 /* ------------------------------------------- 1. seed a clean database */
 section("1. Seed i bazës (npm run seed)");
@@ -110,9 +109,8 @@ for (const n of ["Pije", "Mish dhe Ushqim", "Ëmbëlsira", "Menze"])
 ok(!rows.some(r => r.active === 1 && r.category_name === "Të tjera"), "asnjë produkt aktiv nuk mbetet në 'Të tjera'");
 ok(!rows.some(r => r.active === 1 && (r.name === "Qebapa" || r.name === "Qebap")), "emrat e vjetër 'Qebapa'/'Qebap' nuk janë më aktivë");
 for (const b of BEERS) ok(activeOf(b).every(r => r.category_name === "Pije"), `"${b}" është në 'Pije' (jo 'Të tjera'/'Ëmbëlsira')`);
-const pejaV = activeOf("Birra Peje E vogel"), pejaM = activeOf("Birra Peje E madhe");
-ok(pejaV.length === 1 && pejaM.length === 1, "Birra Peje e vogël dhe e madhe janë dy produkte të veçantë");
-ok(pejaV.length === 1 && pejaM.length === 1 && pejaV[0].price_cents === pejaM[0].price_cents, "të dy Pejat kanë çmim të njëjtë (nuk ndryshoi)");
+const peja = activeOf("Birra Peje");
+ok(peja.length === 1 && peja[0].price_cents === 100, "Birra Peje ekziston një herë me çmimin 1.00€");
 db.close();
 
 /* ------------------------------------ 3. frontend photo mapper (productPhoto) */
@@ -141,6 +139,11 @@ ok(srcOf("Laqko", "PIJE", "Të tjera") === "/images/lasko.jpg", "Laqko me katego
 ok(srcOf("Ice Smirnof", "PIJE", "Pije") === "/images/smirnoff-ice.jpg", "Ice Smirnof → smirnoff-ice.jpg");
 ok(srcOf("Henikeni", "PIJE", "Pije") === "/images/heineken.jpg", "Henikeni → heineken.jpg");
 ok(srcOf("Jagermeister", "PIJE", "Pije") === "/images/jagermeister.png", "Jagermeister → jagermeister.png (shishja e likerit)");
+ok(srcOf("Multisola", "PIJE", "Pije") === "/images/multisola.jpg", "Multisola → fotografia e vet lokale");
+ok(srcOf("Ice Tea", "PIJE", "Pije") === "/images/ice-tea.png", "Ice Tea → fotografia e vet lokale");
+ok(srcOf("Multisola", "PIJE", "Pije") !== srcOf("Ice Tea", "PIJE", "Pije"), "Multisola dhe Ice Tea nuk ndajnë fotografinë e njëjtë");
+ok(isPhoto("/images/multisola.jpg"), "fotoja e Multisola është imazh real i vlefshëm");
+ok(isPhoto("/images/ice-tea.png"), "fotoja e Ice Tea është imazh real i vlefshëm");
 ok(srcOf("Jägermeister", "PIJE", "Pije") === "/images/jagermeister.png", "Jägermeister me umlaut → e njëjta foto");
 ok(srcOf("Jagermeister", "PIJE", "Pije") !== "/images/juice.jpg", "Jagermeister nuk bie në foton e përgjithshme të pijeve");
 ok(isPhoto("/images/jagermeister.png"), "fotoja e Jagermeister është PNG real me transparencë");
@@ -149,8 +152,7 @@ for (const b of BEERS) {
   ok(srcOf(b, "PIJE", "Të tjera") === srcOf(b, "PIJE", "Pije"), `"${b}" ka foto edhe kur kategoria e vjetër është e gabuar`);
   ok(!/trileqe|snickers|torte/i.test(srcOf(b, "PIJE", "Pije")), `"${b}" nuk përdor foto torte`);
 }
-ok(srcOf("Birra Peje E vogel", "PIJE", "Pije") === srcOf("Birra Peje E madhe", "PIJE", "Pije"), "të dy Pejat përdorin të njëjtën foto");
-ok(srcOf("Birra Peje E vogel", "PIJE", "Pije") === "/images/birra-peja.jpg", "Peja → birra-peja.jpg");
+ok(srcOf("Birra Peje", "PIJE", "Pije") === "/images/birra-peja.jpg", "Peja → birra-peja.jpg");
 ok(srcOf("Trileqe", "EMBELSIRE", "Ëmbëlsira") === "/images/trileqe.jpg", "Trileqe → trileqe.jpg");
 ok(srcOf("Torte Snikers", "EMBELSIRE", "Ëmbëlsira") === "/images/snickers-cake.jpg", "Torte Snikers → snickers-cake.jpg");
 ok(srcOf("Qebap (1 copë)", "USHQIM", "Mish dhe Ushqim") === "/images/qebap.jpg", "Qebap (1 copë) → qebap.jpg");
@@ -163,7 +165,8 @@ ok(srcOf("Mish i Bardh", "USHQIM", "Mish dhe Ushqim") === "/images/grill-platter
 ok(!["/images/burger-mish-i-bardh.jpg", "/images/burger-sandwich.jpg"].includes(srcOf("Mish i Bardh", "USHQIM", "Mish dhe Ushqim")), "Mish i Bardh i thjeshtë nuk merr asnjë foto burgeri");
 ok(srcOf("Pule", "USHQIM", "Mish dhe Ushqim") === "/images/grilled-chicken.jpg", "Pule mbetet me foton e mishit të pjekur");
 ok(["/images/lasko.jpg", "/images/birra-peja.jpg", "/images/bavaria.jpg", "/images/smirnoff-ice.jpg", "/images/heineken.jpg", "/images/qebap.jpg"].every(isPhoto), "fotot e pijeve/qebapit janë foto reale (jo placeholder)");
-ok(!/(placehold\.|via\.placeholder|\.svg|picsum|unsplash\.it)/i.test(appJs), "frontend-i nuk përdor placeholder ose hotlink");
+const productImageCode = appJs.replace(/\/api\/admin\/menu-qr\.svg/g, "").replace(/sharri-menu-qr\.svg/g, "");
+ok(!/(placehold\.|via\.placeholder|\.svg|picsum|unsplash\.it)/i.test(productImageCode), "frontend-i nuk përdor placeholder ose hotlink për produktet");
 
 /* ---------------- 5. existing database: migrate without touching the orders */
 section("5. Sinkronizimi i bazës ekzistuese (Pa fshirë porositë)");
@@ -179,6 +182,7 @@ const emb = tdb.prepare("SELECT id FROM categories WHERE name='Ëmbëlsira'").ge
 const pije = tdb.prepare("SELECT id FROM categories WHERE name='Pije'").get().id;
 tdb.prepare("UPDATE products SET name='Qebapa' WHERE name='Qebap (1 copë)'").run();
 tdb.prepare("UPDATE products SET category_id=?,price_cents=999 WHERE name='Laqko'").run(emb);
+tdb.prepare("UPDATE products SET price_cents=250 WHERE name='Jagermeister'").run();
 tdb.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)").run(emb, "Birra Peje E vogel", 100, "PIJE", 99);
 tdb.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)").run(pije, "Hamburger", 185, "USHQIM", 98);
 // an older database that does not know the new products yet
@@ -212,9 +216,12 @@ ok(!q("Qebapa").some(r => r.active === 1), "emri i vjetër 'Qebapa' u çaktivizu
 const laqko = q("Laqko").filter(r => r.active === 1);
 ok(laqko.length === 1 && laqko[0].category_name === "Pije", "Laqko u zhvendos nga 'Ëmbëlsira' në 'Pije' (një rresht aktiv)");
 ok(laqko.length === 1 && laqko[0].price_cents === 150, "Laqko mori çmimin e menusë 1.50€", laqko.length === 1 ? (laqko[0].price_cents / 100).toFixed(2) + "€" : "-");
-const pejeRows = q("Birra Peje E vogel");
-ok(pejeRows.filter(r => r.active === 1).length === 1, "dublikati i Pejës u ngec në një rresht aktiv", pejeRows.filter(r => r.active === 1).length + " aktiv");
-ok(pejeRows.filter(r => r.active === 1).every(r => r.category_name === "Pije"), "Peja e vogël mbeti në 'Pije'");
+const jager = q("Jagermeister").filter(r => r.active === 1);
+ok(jager.length === 1 && jager[0].price_cents === 150 && jager[0].category_name === "Pije", "Jagermeister i bazës së vjetër u përditësua në 1.50€", jager.length === 1 ? (jager[0].price_cents / 100).toFixed(2) + "€" : "mungon");
+const pejeRows = q("Birra Peje").filter(r => r.active === 1);
+ok(pejeRows.length === 1, "Peja e dublikuar u sinkronizua në një rresht aktiv", pejeRows.length + " aktiv");
+ok(pejeRows.length === 1 && pejeRows[0].price_cents === 100 && pejeRows[0].category_name === "Pije", "Peja mbeti në 'Pije' me çmimin 1.00€");
+ok(!q("Birra Peje E vogel").some(r => r.active === 1), "emri i vjetër i madhësisë së Pejës u çaktivizua");
 const burgers = q("Hamburger").filter(r => r.active === 1);
 ok(burgers.length === 1 && burgers[0].price_cents === 200, "Hamburger u krijua me 2.00€ dhe nuk u dublo", JSON.stringify(burgers));
 const mishBurger = q("Hamburger + Mish i Bardh").filter(r => r.active === 1);
