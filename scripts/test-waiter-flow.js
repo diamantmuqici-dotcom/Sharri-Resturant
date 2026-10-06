@@ -275,6 +275,72 @@ async function main() {
     ok(noteHistoryResponse.ok && noteHistory.items.some(i => i.notes === "Komplet me majonez") &&
       noteHistory.events.some(e => e.event_type === "SHENIM_U_NDRYSHUA"),
       "administrata sheh shenimet e artikujve dhe historikun e shenimeve");
+
+
+    /* ---- porosia hiqet nga aktivet vetëm pas miratimit të administratorit */
+    const cancelOrderResponse = await fetch(BASE + "/api/porosi", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ orderType: "TAVOLINE", tableNumber: 10, items: [{ productId: coffee.id, quantity: 1 }] }),
+    });
+    const cancelOrderBody = await cancelOrderResponse.json();
+    const emptyReason = await fetch(BASE + "/api/porosi/" + cancelOrderBody.id + "/kerkese-anulim", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ reason: "   " }),
+    });
+    ok(emptyReason.status === 400, "kërkesa për anulim nuk pranohet pa arsye");
+    const cancelRequestResponse = await fetch(BASE + "/api/porosi/" + cancelOrderBody.id + "/kerkese-anulim", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ reason: "Klienti e anuloi porosinë." }),
+    });
+    const cancelRequestBody = await cancelRequestResponse.json();
+    const pendingOrder = await jget("/api/porosi/" + cancelOrderBody.id);
+    ok(cancelRequestResponse.status === 201 && pendingOrder.status === "ACTIVE" &&
+      pendingOrder.cancellation_request.status === "PENDING" && pendingOrder.cancellation_request.reason === "Klienti e anuloi porosinë.",
+      "porosia mbetet aktive derisa administratori ta miratojë; arsyeja ruhet");
+    const waiterQueue = await fetch(BASE + "/api/anulimet", { headers: { Cookie: cookie } });
+    ok(waiterQueue.status === 403, "kërkesat për anulim mund t'i shqyrtojë vetëm administratori");
+    const blockedPayment = await fetch(BASE + "/api/porosi/" + cancelOrderBody.id + "/pagesa", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ method: "CASH" }),
+    });
+    ok(blockedPayment.status === 409, "pagesa bllokohet derisa kërkesa për anulim të shqyrtohet");
+    const pendingActive = (await jget("/api/aktive")).find(x => x.id === cancelOrderBody.id);
+    ok(pendingActive && pendingActive.cancellation_request_status === "PENDING", "porosia në pritje mbetet e dukshme te porositë aktive");
+    const queueResponse = await fetch(BASE + "/api/anulimet", { headers: { Cookie: adminCookie } });
+    const queue = await queueResponse.json();
+    const queuedRequest = queue.find(x => x.id === cancelRequestBody.id);
+    ok(queueResponse.ok && queuedRequest && queuedRequest.reason === "Klienti e anuloi porosinë." && queuedRequest.requested_by_name === "Kamarieri",
+      "administratori sheh kërkesën, arsyen dhe kamarierin që e dërgoi");
+    const approveResponse = await fetch(BASE + "/api/anulimet/" + cancelRequestBody.id + "/prano", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: adminCookie }, body: JSON.stringify({}),
+    });
+    const approvedOrder = await jget("/api/porosi/" + cancelOrderBody.id);
+    const approvedHistoryResponse = await fetch(BASE + "/api/historiku/" + cancelOrderBody.id, { headers: { Cookie: adminCookie } });
+    const approvedHistory = await approvedHistoryResponse.json();
+    ok(approveResponse.ok && approvedOrder.status === "CANCELLED" && approvedOrder.items.length === 1 &&
+      approvedOrder.cancellation_request.status === "APPROVED", "miratimi e anulon porosinë pa fshirë rreshtat ose historikun");
+    ok(approvedHistoryResponse.ok && approvedHistory.events.some(e => e.event_type === "ANULIM_U_KERKUA") &&
+      approvedHistory.events.some(e => e.event_type === "POROSI_E_ANULUAR" && JSON.parse(e.details).arsye === "Klienti e anuloi porosinë."),
+      "arsyeja dhe miratimi ruhen në historikun e porosisë");
+    ok(!(await jget("/api/aktive")).some(x => x.id === cancelOrderBody.id), "pas miratimit porosia largohet nga lista aktive");
+
+    const rejectOrderResponse = await fetch(BASE + "/api/porosi", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ orderType: "TAVOLINE", tableNumber: 11, items: [{ productId: coffee.id, quantity: 1 }] }),
+    });
+    const rejectOrderBody = await rejectOrderResponse.json();
+    const rejectRequestResponse = await fetch(BASE + "/api/porosi/" + rejectOrderBody.id + "/kerkese-anulim", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ reason: "Porosia u fut gabimisht." }),
+    });
+    const rejectRequestBody = await rejectRequestResponse.json();
+    const rejectDecision = await fetch(BASE + "/api/anulimet/" + rejectRequestBody.id + "/refuzo", {
+      method: "POST", headers: { "Content-Type": "application/json", Cookie: adminCookie },
+      body: JSON.stringify({ note: "Porosia duhet të mbetet aktive." }),
+    });
+    const rejectedOrder = await jget("/api/porosi/" + rejectOrderBody.id);
+    ok(rejectDecision.ok && rejectedOrder.status === "ACTIVE" && rejectedOrder.cancellation_request.status === "REJECTED" &&
+      rejectedOrder.cancellation_request.decision_note === "Porosia duhet të mbetet aktive.",
+      "refuzimi e lë porosinë aktive dhe shënimi i administratorit ruhet");
+    ok(rejectedOrder.events.some(e => e.event_type === "ANULIM_U_REFUZUA"), "refuzimi regjistrohet në kronologjinë e porosisë");
   } finally {
     stop();
   }

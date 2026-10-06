@@ -19,6 +19,7 @@ Ndërfaqja është vetëm në shqip/Kosovo Albanian.
 - Çdo artikull mund të ketë **shenim** (p.sh. “Komplet me majonez”, “Pa qepë”, “Pa tranguj”). Shenimi nuk e ndryshon çmimin: porosia **komplet** mbetet me çmimin normal të produktit, ndërsa shtesat e porositura veç (Suxhuk, Pomfrit, Extra djath...) paguhen ekstra. Shenimi shfaqet te porosia aktive dhe te historiku, dhe ndryshimi i tij ruhet në kronologji.
 - Këto orë shfaqen te porosia aktive dhe te detajet e porosisë në historikun e administratës, për krahasim me kamerat.
 - Çdo veprim i rëndësishëm ruhet në gjurmët e sistemit.
+- Kamarieri mund të kërkojë anulimin e porosisë vetëm duke dhënë arsye. Porosia nuk largohet nga porositë aktive dhe pagesa/redaktimi bllokohen derisa administratori ta pranojë ose refuzojë kërkesën. Pranimi e shënon porosinë të anuluar dhe e ruan atë, arsyen dhe vendimin në historik; refuzimi e lë porosinë aktive.
 
 ## Nisja
 Kërkohet Node.js 20+.
@@ -70,6 +71,6 @@ Lokalisht:
 
     npm test
 
-Kontrolli përfshin: sintaksën (`node --check` për `server.js`, `db.js`, `public/app.js`), menunë dhe çmimet në bazë (përfshirë *Shtesa*, *Pjatë ushqimi* dhe *Hamburger + Mish i Bardh*), mapimin e fotove në frontend (burgeri me mish të bardhë ka foto të vet, mishi i bardhë i thjeshtë mbetet me foton e mishit të pjekur), migrimin e një baze ekzistuese pa prekur porositë/pagesat (edhe shtimin e produktit të re në një bazë të vjetër), dhe rrjedhën e kamarierit në "POROSI E RE" (fotot nën *Pije* dhe *Mish dhe Ushqim*, për porosi të re dhe aktive, si dhe shenimet e artikujve: “komplet” mbetet çmim normal, shtesa veç, ndryshimi i shenimit në kronologji).
+Kontrolli përfshin: sintaksën (`node --check` për `server.js`, `db.js`, `public/app.js`), menunë dhe çmimet në bazë (përfshirë *Shtesa*, *Pjatë ushqimi* dhe *Hamburger + Mish i Bardh*), mapimin e fotove në frontend (burgeri me mish të bardhë ka foto të vet, mishi i bardhë i thjeshtë mbetet me foton e mishit të pjekur), migrimin e një baze ekzistuese pa prekur porositë/pagesat (edhe shtimin e produktit të re në një bazë të vjetër), dhe rrjedhën e kamarierit në "POROSI E RE" (fotot nën *Pije* dhe *Mish dhe Ushqim*, për porosi të re dhe aktive, shenimet e artikujve, si dhe kërkesën për anulim me arsye, miratimin/refuzimin nga administratori dhe ruajtjen në historik).
 
 Shënim: `better-sqlite3` kompilohet në instalim. Përdor Node 22 (p.sh. me `fnm use 22`); Node 26+ nuk e kompilon versionin 11.x.

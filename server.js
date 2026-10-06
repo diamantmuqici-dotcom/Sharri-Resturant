@@ -9,6 +9,7 @@ if(!fs.existsSync(path.join(__dirname,"data","sharri.db")))require("./db");
 const db=new Database(path.join(__dirname,"data","sharri.db"));
 db.pragma("journal_mode=WAL");db.pragma("foreign_keys=ON");
 if(!db.prepare("PRAGMA table_info(orders)").all().some(x=>x.name==="unpaid_at"))db.exec("ALTER TABLE orders ADD COLUMN unpaid_at TEXT");
+db.exec("CREATE TABLE IF NOT EXISTS cancellation_requests(id INTEGER PRIMARY KEY AUTOINCREMENT,order_id INTEGER NOT NULL,requested_by INTEGER NOT NULL,reason TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','APPROVED','REJECTED')),reviewed_by INTEGER,reviewed_at TEXT,decision_note TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(order_id) REFERENCES orders(id),FOREIGN KEY(requested_by) REFERENCES users(id),FOREIGN KEY(reviewed_by) REFERENCES users(id));CREATE INDEX IF NOT EXISTS idx_cancellation_requests_status ON cancellation_requests(status,created_at);CREATE UNIQUE INDEX IF NOT EXISTS idx_cancellation_requests_pending_order ON cancellation_requests(order_id) WHERE status='PENDING'");
 const app=express();
 app.use(express.json({limit:"256kb"}));
 app.use(session({secret:process.env.SESSION_SECRET||"ndrysho-kete-sekret",resave:false,saveUninitialized:false,cookie:{httpOnly:true,sameSite:"lax",secure:process.env.NODE_ENV==="production",maxAge:43200000}}));
@@ -24,14 +25,70 @@ function items(id){return db.prepare("SELECT * FROM order_items WHERE order_id=?
 function order(id){return db.prepare("SELECT o.*,t.number table_number,u.name waiter_name FROM orders o LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users u ON u.id=o.waiter_id WHERE o.id=?").get(id)}
 function food(k){return k==="USHQIM"||k==="EMBELSIRE"}
 function noteText(v){const s=String(v==null?"":v).replace(/\s+/g," ").trim();return s?s.slice(0,200):null}
+function pendingCancellation(id){return db.prepare("SELECT * FROM cancellation_requests WHERE order_id=? AND status=\'PENDING\' ORDER BY id DESC LIMIT 1").get(id)||null}
+function latestCancellationRequest(id){return db.prepare("SELECT r.*,requested.name requested_by_name,reviewer.name reviewed_by_name FROM cancellation_requests r LEFT JOIN users requested ON requested.id=r.requested_by LEFT JOIN users reviewer ON reviewer.id=r.reviewed_by WHERE r.order_id=? ORDER BY r.id DESC LIMIT 1").get(id)||null}
 app.get("/api/health",(q,r)=>r.json({ok:true,service:"sharri-pos"}));
 app.get("/api/sesioni",(q,r)=>q.session.user?r.json({loggedIn:true,user:q.session.user}):r.json({loggedIn:false}));
 app.post("/api/kycu",(q,r)=>{const u=db.prepare("SELECT * FROM users WHERE username=? AND active=1").get(String(q.body.username||""));if(!u||!bcrypt.compareSync(String(q.body.password||""),u.password_hash))return r.status(401).json({error:"Përdoruesi ose fjalëkalimi nuk është i saktë."});q.session.user={id:u.id,username:u.username,name:u.name,role:u.role};audit(u.id,"KYÇJE","USER",u.id);r.json({ok:true,user:q.session.user})});
 app.post("/api/dil",(q,r)=>q.session.destroy(()=>r.json({ok:true})));
 app.get("/api/menu",auth,(q,r)=>r.json({categories:db.prepare("SELECT * FROM categories WHERE active=1 ORDER BY display_order").all(),products:db.prepare("SELECT p.*,c.name category_name FROM products p JOIN categories c ON c.id=p.category_id WHERE p.active=1 ORDER BY c.display_order,p.display_order").all()}));
-app.get("/api/aktive",auth,(q,r)=>r.json(db.prepare("SELECT o.*,t.number table_number,u.name waiter_name,(SELECT COUNT(*) FROM order_items i WHERE i.order_id=o.id) item_count FROM orders o LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users u ON u.id=o.waiter_id WHERE o.status IN ('ACTIVE','PAYMENT_PENDING') ORDER BY o.opened_at DESC").all()));
+app.get("/api/aktive",auth,(q,r)=>r.json(db.prepare("SELECT o.*,t.number table_number,u.name waiter_name,(SELECT COUNT(*) FROM order_items i WHERE i.order_id=o.id) item_count,cr.status cancellation_request_status,cr.reason cancellation_request_reason,cr.created_at cancellation_requested_at FROM orders o LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users u ON u.id=o.waiter_id LEFT JOIN cancellation_requests cr ON cr.id=(SELECT r.id FROM cancellation_requests r WHERE r.order_id=o.id ORDER BY r.id DESC LIMIT 1) WHERE o.status IN ('ACTIVE','PAYMENT_PENDING') ORDER BY o.opened_at DESC").all()));
 app.get("/api/tavolinat",auth,(q,r)=>{const a=db.prepare("SELECT t.id,t.number,o.id order_id,o.total_cents FROM tables_restaurant t LEFT JOIN orders o ON o.table_id=t.id AND o.status IN ('ACTIVE','PAYMENT_PENDING') ORDER BY t.number").all();const occupied=a.filter(x=>x.order_id).length;r.json({total:50,occupied,free:50-occupied,tables:a})});
-app.get("/api/porosi/:id",auth,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});r.json({...o,items:items(o.id),events:db.prepare("SELECT e.*,u.name actor_name FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY julianday(e.created_at),e.id").all(o.id)})});
+app.get("/api/porosi/:id",auth,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});r.json({...o,items:items(o.id),events:db.prepare("SELECT e.*,u.name actor_name FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY julianday(e.created_at),e.id").all(o.id),cancellation_request:latestCancellationRequest(o.id)})});
+app.post("/api/porosi/:id/kerkese-anulim",auth,(q,r)=>{
+ if(q.session.user.role!=="KAMARIER")return r.status(403).json({error:"Vetëm kamarieri mund të dërgojë kërkesë për anulim."});
+ const o=order(q.params.id),reason=String(q.body.reason||"").replace(/\s+/g," ").trim();
+ if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});
+ if(o.status!=="ACTIVE")return r.status(400).json({error:"Vetëm porosia aktive mund të dërgohet për anulim."});
+ if(!reason)return r.status(400).json({error:"Shkruani arsyen e anulimit."});
+ if(reason.length>500)return r.status(400).json({error:"Arsyeja nuk mund të jetë më e gjatë se 500 shenja."});
+ if(pendingCancellation(o.id))return r.status(409).json({error:"Kjo porosi ka tashmë një kërkesë në pritje."});
+ const createdAt=now();
+ const tx=db.transaction(()=>{
+   const result=db.prepare("INSERT INTO cancellation_requests(order_id,requested_by,reason,created_at) VALUES(?,?,?,?)").run(o.id,q.session.user.id,reason,createdAt);
+   const requestId=result.lastInsertRowid;
+   event(o.id,"ANULIM_U_KERKUA",{requestId,arsye:reason},q.session.user.id,createdAt);
+   audit(q.session.user.id,"KERKO_ANULIM_POROSIE","ORDER",o.id,{requestId,reason});
+   return requestId;
+ });
+ try{return r.status(201).json({ok:true,id:tx()})}catch(e){if(String(e.message||"").indexOf("UNIQUE")!==-1)return r.status(409).json({error:"Kjo porosi ka tashmë një kërkesë në pritje."});throw e}
+});
+app.get("/api/anulimet",admin,(q,r)=>r.json(db.prepare("SELECT cr.*,o.order_number,o.order_type,o.total_cents,o.custom_identifier,t.number table_number,w.name waiter_name,requester.name requested_by_name FROM cancellation_requests cr JOIN orders o ON o.id=cr.order_id LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users w ON w.id=o.waiter_id JOIN users requester ON requester.id=cr.requested_by WHERE cr.status=\'PENDING\' ORDER BY cr.created_at ASC,cr.id ASC").all()));
+app.post("/api/anulimet/:id/prano",admin,(q,r)=>{
+ const requestId=Number(q.params.id),createdAt=now();
+ const tx=db.transaction(()=>{
+   const request=db.prepare("SELECT * FROM cancellation_requests WHERE id=? AND status=\'PENDING\'").get(requestId);
+   if(!request)return null;
+   const o=order(request.order_id);
+   if(!o||o.status!=="ACTIVE")return false;
+   db.prepare("UPDATE orders SET status=\'CANCELLED\',updated_at=? WHERE id=? AND status=\'ACTIVE\'").run(createdAt,o.id);
+   db.prepare("UPDATE cancellation_requests SET status=\'APPROVED\',reviewed_by=?,reviewed_at=? WHERE id=? AND status=\'PENDING\'").run(q.session.user.id,createdAt,request.id);
+   event(o.id,"POROSI_E_ANULUAR",{arsye:request.reason,requestId:request.id,requestedBy:request.requested_by,approvedBy:q.session.user.id},q.session.user.id,createdAt);
+   audit(q.session.user.id,"MIRATO_ANULIM_POROSIE","ORDER",o.id,{requestId:request.id,requestedBy:request.requested_by,reason:request.reason});
+   return o.id;
+ });
+ const result=tx();
+ if(result===null)return r.status(404).json({error:"Kërkesa nuk u gjet ose është shqyrtuar tashmë."});
+ if(result===false)return r.status(409).json({error:"Porosia nuk është më aktive dhe nuk mund të anulohet."});
+ r.json({ok:true,orderId:result});
+});
+app.post("/api/anulimet/:id/refuzo",admin,(q,r)=>{
+ const requestId=Number(q.params.id),note=String(q.body.note||"").replace(/\s+/g," ").trim();
+ if(note.length>300)return r.status(400).json({error:"Shënimi nuk mund të jetë më i gjatë se 300 shenja."});
+ const reviewedAt=now();
+ const tx=db.transaction(()=>{
+   const request=db.prepare("SELECT * FROM cancellation_requests WHERE id=? AND status=\'PENDING\'").get(requestId);
+   if(!request)return null;
+   const result=db.prepare("UPDATE cancellation_requests SET status=\'REJECTED\',reviewed_by=?,reviewed_at=?,decision_note=? WHERE id=? AND status=\'PENDING\'").run(q.session.user.id,reviewedAt,note||null,request.id);
+   if(!result.changes)return null;
+   event(request.order_id,"ANULIM_U_REFUZUA",{requestId:request.id,arsye:request.reason,shenim:note||null},q.session.user.id,reviewedAt);
+   audit(q.session.user.id,"REFUZO_ANULIM_POROSIE","ORDER",request.order_id,{requestId:request.id,requestedBy:request.requested_by,reason:request.reason,note:note||null});
+   return request.order_id;
+ });
+ const result=tx();
+ if(result===null)return r.status(404).json({error:"Kërkesa nuk u gjet ose është shqyrtuar tashmë."});
+ r.json({ok:true,orderId:result});
+});
 app.post("/api/porosi",auth,(q,r)=>{
  const type=String(q.body.orderType||""),table=Number(q.body.tableNumber),name=String(q.body.customIdentifier||"").trim(),raw=Array.isArray(q.body.items)?q.body.items:[];
  if(!raw.length)return r.status(400).json({error:"Shtoni të paktën një produkt."});
@@ -57,6 +114,7 @@ app.post("/api/porosi",auth,(q,r)=>{
 app.post("/api/porosi/:id/shto",auth,(q,r)=>{
  const o=order(q.params.id),p=db.prepare("SELECT * FROM products WHERE id=? AND active=1").get(Number(q.body.productId)),notes=noteText(q.body.notes);
  if(!o||o.status!=="ACTIVE"||!p)return r.status(400).json({error:"Porosia ose produkti nuk është aktiv."});
+ if(pendingCancellation(o.id))return r.status(409).json({error:"Porosia ka kërkesë për anulim në pritje të miratimit."});
  const createdAt=now();
  const tx=db.transaction(()=>{
    const i=db.prepare("INSERT INTO order_items(order_id,product_id,product_name_snapshot,unit_price_cents,quantity,notes,created_at) VALUES(?,?,?,?,1,?,?)").run(o.id,p.id,p.name,p.price_cents,notes,createdAt);
@@ -70,6 +128,7 @@ app.post("/api/porosi/:id/shto",auth,(q,r)=>{
 app.patch("/api/porosi/:id/shenim",auth,(q,r)=>{
  const o=order(q.params.id),i=db.prepare("SELECT * FROM order_items WHERE id=? AND order_id=?").get(Number(q.body.itemId),q.params.id),notes=noteText(q.body.notes);
  if(!o||o.status!=="ACTIVE"||!i)return r.status(400).json({error:"Porosia ose produkti nuk është aktiv."});
+ if(pendingCancellation(o.id))return r.status(409).json({error:"Porosia ka kërkesë për anulim në pritje të miratimit."});
  if((i.notes||null)===notes)return r.json({ok:true});
  const changedAt=now();
  const tx=db.transaction(()=>{
@@ -84,6 +143,7 @@ app.patch("/api/porosi/:id/sasia",auth,(q,r)=>{
  const o=order(q.params.id),rawQuantity=Number(q.body.quantity),n=Math.floor(rawQuantity);
  const i=db.prepare("SELECT * FROM order_items WHERE id=? AND order_id=?").get(Number(q.body.itemId),q.params.id);
  if(!o||o.status!=="ACTIVE"||!i||!Number.isFinite(rawQuantity)||rawQuantity!==n||n<0||n>999)return r.status(400).json({error:"Sasia nuk është e vlefshme."});
+ if(pendingCancellation(o.id))return r.status(409).json({error:"Porosia ka kërkesë për anulim në pritje të miratimit."});
  if(n===i.quantity)return r.json({ok:true});
  if(n===0&&total(o.id)-i.quantity*i.unit_price_cents<=0)return r.status(400).json({error:"Porosia duhet të ketë të paktën një produkt."});
  const changedAt=now();
@@ -97,10 +157,10 @@ app.patch("/api/porosi/:id/sasia",auth,(q,r)=>{
  tx();
  r.json({ok:true})
 });
-app.post("/api/porosi/:id/pagesa",auth,(q,r)=>{const o=order(q.params.id),m=String(q.body.method||"");if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});if(o.status==="PAID")return r.status(409).json({error:"Pagesa është regjistruar tashmë."});if(o.status==="CANCELLED")return r.status(400).json({error:"Porosia është anuluar."});if(!["ACTIVE","UNPAID"].includes(o.status))return r.status(400).json({error:"Kjo porosi nuk mund të paguhet."});if(!["CASH","CARD","OTHER"].includes(m))return r.status(400).json({error:"Zgjidhni mënyrën e pagesës."});const s=total(o.id);const tx=db.transaction(()=>{db.prepare("UPDATE orders SET status='PAID',total_cents=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,unpaid_at=NULL WHERE id=? AND status IN ('ACTIVE','UNPAID')").run(s,o.id);db.prepare("INSERT INTO payments(order_id,amount_cents,method,created_by) VALUES(?,?,?,?)").run(o.id,s,m,q.session.user.id);event(o.id,"PAGESA_U_PERFUND",""+m,q.session.user.id);audit(q.session.user.id,"PAGESA_PERFUND","ORDER",o.id,{method:m,total:s})});tx();r.json({ok:true})});
-app.post("/api/porosi/:id/mospagu",auth,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});if(o.status!=="ACTIVE")return r.status(400).json({error:"Vetëm porosia aktive mund të shënohet si e papaguar."});db.prepare("UPDATE orders SET status='UNPAID',unpaid_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='ACTIVE'").run(o.id);event(o.id,"NUK_U_PAGUA",{total:o.total_cents},q.session.user.id);audit(q.session.user.id,"NUK_U_PAGUA","ORDER",o.id,{total:o.total_cents});r.json({ok:true})});
+app.post("/api/porosi/:id/pagesa",auth,(q,r)=>{const o=order(q.params.id),m=String(q.body.method||"");if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});if(pendingCancellation(o.id))return r.status(409).json({error:"Pagesa është ndalur derisa administratori ta shqyrtojë kërkesën për anulim."});if(o.status==="PAID")return r.status(409).json({error:"Pagesa është regjistruar tashmë."});if(o.status==="CANCELLED")return r.status(400).json({error:"Porosia është anuluar."});if(!["ACTIVE","UNPAID"].includes(o.status))return r.status(400).json({error:"Kjo porosi nuk mund të paguhet."});if(!["CASH","CARD","OTHER"].includes(m))return r.status(400).json({error:"Zgjidhni mënyrën e pagesës."});const s=total(o.id);const tx=db.transaction(()=>{db.prepare("UPDATE orders SET status='PAID',total_cents=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,unpaid_at=NULL WHERE id=? AND status IN ('ACTIVE','UNPAID')").run(s,o.id);db.prepare("INSERT INTO payments(order_id,amount_cents,method,created_by) VALUES(?,?,?,?)").run(o.id,s,m,q.session.user.id);event(o.id,"PAGESA_U_PERFUND",""+m,q.session.user.id);audit(q.session.user.id,"PAGESA_PERFUND","ORDER",o.id,{method:m,total:s})});tx();r.json({ok:true})});
+app.post("/api/porosi/:id/mospagu",auth,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});if(pendingCancellation(o.id))return r.status(409).json({error:"Porosia ka kërkesë për anulim në pritje të miratimit."});if(o.status!=="ACTIVE")return r.status(400).json({error:"Vetëm porosia aktive mund të shënohet si e papaguar."});db.prepare("UPDATE orders SET status='UNPAID',unpaid_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='ACTIVE'").run(o.id);event(o.id,"NUK_U_PAGUA",{total:o.total_cents},q.session.user.id);audit(q.session.user.id,"NUK_U_PAGUA","ORDER",o.id,{total:o.total_cents});r.json({ok:true})});
 app.post("/api/porosi/:id/paguaj",admin,(q,r)=>{const o=order(q.params.id),m=String(q.body.method||"");if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});if(o.status!=="UNPAID")return r.status(400).json({error:"Porosia nuk është në listën e papaguara."});if(!["CASH","CARD","OTHER"].includes(m))return r.status(400).json({error:"Zgjidhni mënyrën e pagesës."});const s=total(o.id);const tx=db.transaction(()=>{db.prepare("UPDATE orders SET status='PAID',total_cents=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,unpaid_at=NULL WHERE id=? AND status='UNPAID'").run(s,o.id);db.prepare("INSERT INTO payments(order_id,amount_cents,method,created_by) VALUES(?,?,?,?)").run(o.id,s,m,q.session.user.id);event(o.id,"PAGESA_U_PERFUND_NGA_ADMIN",{method:m,total:s},q.session.user.id);audit(q.session.user.id,"PAGESA_U_PERFUND_NGA_ADMIN","ORDER",o.id,{method:m,total:s})});tx();r.json({ok:true})});
-app.post("/api/porosi/:id/anulo",admin,(q,r)=>{const o=order(q.params.id),reason=String(q.body.reason||"").trim();if(!o||o.status!=="ACTIVE")return r.status(400).json({error:"Porosia nuk është aktive."});if(!reason)return r.status(400).json({error:"Shkruani arsyen."});db.prepare("UPDATE orders SET status='CANCELLED',updated_at=CURRENT_TIMESTAMP WHERE id=?").run(o.id);event(o.id,"POROSI_E_ANULUAR",{arsye:reason},q.session.user.id);audit(q.session.user.id,"ANULO_POROSI","ORDER",o.id,{reason});r.json({ok:true})});
+app.post("/api/porosi/:id/anulo",admin,(q,r)=>{const o=order(q.params.id),reason=String(q.body.reason||"").trim();if(!o||o.status!=="ACTIVE")return r.status(400).json({error:"Porosia nuk është aktive."});if(pendingCancellation(o.id))return r.status(409).json({error:"Kjo porosi ka kërkesë në pritje. Shqyrtojeni te Kërkesat për anulim."});if(!reason)return r.status(400).json({error:"Shkruani arsyen."});db.prepare("UPDATE orders SET status='CANCELLED',updated_at=CURRENT_TIMESTAMP WHERE id=?").run(o.id);event(o.id,"POROSI_E_ANULUAR",{arsye:reason},q.session.user.id);audit(q.session.user.id,"ANULO_POROSI","ORDER",o.id,{reason});r.json({ok:true})});
 app.get("/api/historiku",admin,(q,r)=>{const term=String(q.query.q||"").trim(),p=[];let s="SELECT o.*,t.number table_number,u.name waiter_name FROM orders o LEFT JOIN tables_restaurant t ON t.id=o.table_id JOIN users u ON u.id=o.waiter_id WHERE o.status IN ('PAID','CANCELLED','UNPAID')";if(term){s+=" AND (CAST(o.order_number AS TEXT) LIKE ? OR CAST(t.number AS TEXT) LIKE ? OR COALESCE(o.custom_identifier,'') LIKE ?)";const z="%"+term+"%";p.push(z,z,z)}s+=" ORDER BY COALESCE(o.completed_at,o.unpaid_at,o.updated_at) DESC LIMIT 500";r.json(db.prepare(s).all(...p))});
 app.get("/api/historiku/:id",admin,(q,r)=>{const o=order(q.params.id);if(!o)return r.status(404).json({error:"Porosia nuk u gjet."});r.json({...o,items:items(o.id),payments:db.prepare("SELECT * FROM payments WHERE order_id=?").all(o.id),events:db.prepare("SELECT e.*,u.name actor_name FROM order_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.order_id=? ORDER BY julianday(e.created_at),e.id").all(o.id)})});
 app.get("/api/statistika",admin,(q,r)=>{const t=db.prepare("SELECT COUNT(*) total,COALESCE(SUM(CASE WHEN status='PAID' THEN total_cents ELSE 0 END),0) revenue,COALESCE(SUM(CASE WHEN status='PAID' THEN 1 ELSE 0 END),0) paid,COALESCE(SUM(CASE WHEN status='CANCELLED' THEN 1 ELSE 0 END),0) cancelled FROM orders WHERE date(COALESCE(completed_at,unpaid_at,opened_at))=date('now','localtime')").get();const top=db.prepare("SELECT product_name_snapshot name,SUM(quantity) quantity FROM order_items i JOIN orders o ON o.id=i.order_id WHERE o.status='PAID' AND date(o.completed_at)=date('now','localtime') GROUP BY product_name_snapshot ORDER BY quantity DESC LIMIT 8").all();r.json({...t,revenue:eur(t.revenue),top})});
