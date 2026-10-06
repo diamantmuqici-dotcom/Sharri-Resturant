@@ -86,6 +86,7 @@ async function main() {
       ["Pica Familjare", 700, "Mish dhe Ushqim"], ["Pica E mesme", 300, "Mish dhe Ushqim"],
       ["Pica E vogel", 200, "Mish dhe Ushqim"], ["Ice Smirnof", 150, "Pije"], ["Henikeni", 150, "Pije"],
       ["Bavaria", 150, "Pije"], ["Laqko", 150, "Pije"], ["Jagermeister", 250, "Pije"],
+      ["Multisola", 100, "Pije"], ["Ice Tea", 100, "Pije"],
     ];
     for (const [n, cents, cat] of PRICES)
       ok(byName(n) && byName(n).price_cents === cents && byName(n).category_id === catId(cat),

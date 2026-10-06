@@ -70,6 +70,8 @@ const EXPECTED = [
   ["Pica e mesme",        "Mish dhe Ushqim",   300, "USHQIM"],   // €3.00
   ["Pica e vogel",        "Mish dhe Ushqim",   200, "USHQIM"],   // €2.00
   ["Ice Smirnof",         "Pije",              150, "PIJE"],
+  ["Multisola",           "Pije",              100, "PIJE"],
+  ["Ice Tea",             "Pije",              100, "PIJE"],
   ["Henikeni",            "Pije",              150, "PIJE"],
   ["Bavaria",             "Pije",              150, "PIJE"],
   ["Laqko",               "Pije",              150, "PIJE"],
@@ -179,9 +181,14 @@ tdb.prepare("UPDATE products SET name='Qebapa' WHERE name='Qebap (1 copë)'").ru
 tdb.prepare("UPDATE products SET category_id=?,price_cents=999 WHERE name='Laqko'").run(emb);
 tdb.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)").run(emb, "Birra Peje E vogel", 100, "PIJE", 99);
 tdb.prepare("INSERT INTO products(category_id,name,price_cents,kind,display_order) VALUES(?,?,?,?,?)").run(pije, "Hamburger", 185, "USHQIM", 98);
-// an older database that does not know the new product yet
+// an older database that does not know the new products yet
 tdb.prepare("DELETE FROM products WHERE name='Hamburger + Mish i Bardh'").run();
 ok(!tdb.prepare("SELECT COUNT(*) n FROM products WHERE name='Hamburger + Mish i Bardh'").get().n, "baza e vjetër nuk e ka 'Hamburger + Mish i Bardh' para sinkronizimit");
+for (const name of ["Multisola", "Ice Tea"]) {
+  tdb.prepare("DELETE FROM products WHERE name=?").run(name);
+  ok(!tdb.prepare("SELECT COUNT(*) n FROM products WHERE name=?").get(name).n,
+    `baza e vjetër nuk e ka '${name}' para sinkronizimit`);
+}
 // a real order + item + payment that must survive the reseed
 const waiter = tdb.prepare("SELECT id FROM users LIMIT 1").get().id;
 tdb.prepare("INSERT INTO orders(order_number,order_type,waiter_id,status,total_cents) VALUES(998,'PER_KETU',?,'PAID',150)").run(waiter);
@@ -213,6 +220,11 @@ ok(burgers.length === 1 && burgers[0].price_cents === 200, "Hamburger u krijua m
 const mishBurger = q("Hamburger + Mish i Bardh").filter(r => r.active === 1);
 ok(mishBurger.length === 1 && mishBurger[0].price_cents === 250 && mishBurger[0].category_name === "Mish dhe Ushqim",
   "produkti i re 'Hamburger + Mish i Bardh' u shtua një herë me 2.50€ nën 'Mish dhe Ushqim'", JSON.stringify(mishBurger));
+for (const name of ["Multisola", "Ice Tea"]) {
+  const product = q(name).filter(r => r.active === 1);
+  ok(product.length === 1 && product[0].price_cents === 100 && product[0].category_name === "Pije",
+    `produkti i ri '${name}' u shtua një herë me 1.00€ nën 'Pije'`, JSON.stringify(product));
+}
 const after = {
   orders: tdb2.prepare("SELECT COUNT(*) n FROM orders").get().n,
   items: tdb2.prepare("SELECT COUNT(*) n FROM order_items").get().n,
