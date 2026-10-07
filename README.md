@@ -25,7 +25,7 @@ Ndërfaqja është vetëm në shqip/Kosovo Albanian.
 - **Kuzhina:** ekrani KUZHINA mbledh porositë me ushqim/ëmbëlsirë, tregon shënimet dhe lejon kalimin nga E re në Në përgatitje e Gati. Rifreskohet automatikisht.
 - **Faturat:** porositë mund të shtypen nga shfletuesi në format termik 58 mm ose 80 mm.
 - **Raportet:** administrata filtron shitjet sipas datave (përfshirë sot/këtë muaj), sheh të hyrat, pagesat sipas mënyrës, bestsellerët dhe porositë e papaguara/anuluara; raportet e porosive shkarkohen si CSV.
-- **Redaktimi i menusë:** administrata mund të ndryshojë emrin, çmimin, kategorinë, renditjen, foton dhe disponueshmërinë. Fotot e ngarkuara ruhen te `data/menu-images/`.
+- **Redaktimi i menusë:** administrata mund të krijojë produkte të reja (+ Shto produkt të ri), të vendosë emrin, çmimin, kategorinë, llojin (ushqim, ëmbëlsirë, pije, kafe, shtesë), foton (ngarkim nga kompjuteri/telefoni ose zgjedhje nga libraria standarde me 30+ foto reale restoranti), renditjen dhe stokun fillestar. Mund të fshijë produkte me mbrojtje automatike (bllokohet nëse produkti është në porosi aktive; fshirja ruan faturat historike). Mund të krijohen edhe kategori të reja. Fotot e ngarkuara ruhen te `data/menu-images/`.
 - **Tavolinat:** paneli i kamarierit ka hartë vizuale të të 50 tavolinave, me gjendjen e lirë/zënë dhe shumën për tavolinat aktive.
 - **Stoku:** produktet e zgjedhura mund të ndiqen në inventar; shitjet e ulin stokun automatikisht, anulimet e miratuara e kthejnë, dhe admini sheh pragjet e stokut të ulët.
 - **Menuja QR:** menu publike, e përshtatshme për telefon, gjendet te `/menu`. Te administrata → QR Menu shkarkohet kodi QR për tavolinat. Në instalim publik vendos `PUBLIC_BASE_URL` në adresën HTTPS të restorantit që kodi të çojë në domenin e saktë.

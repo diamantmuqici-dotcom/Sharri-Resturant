@@ -128,24 +128,166 @@ app.get("/api/public-menu",(q,r)=>{
 app.get("/api/admin/menu",admin,(q,r)=>r.json({categories:db.prepare("SELECT id,name,display_order FROM categories WHERE active=1 ORDER BY display_order").all(),products:db.prepare(menuProductQuery+" WHERE c.active=1 ORDER BY c.display_order,p.display_order,p.id").all()}));
 function validMenuImagePath(imagePath){
  if(!imagePath)return true;
- if(/^\/images\/[A-Za-z0-9_.-]+\.(?:jpe?g|png|webp)$/i.test(imagePath))return fs.existsSync(path.join(__dirname,"public",imagePath.slice(1)));
- if(/^\/menu-images\/[A-Za-z0-9_.-]+\.(?:jpe?g|png|webp)$/i.test(imagePath))return fs.existsSync(path.join(MENU_IMAGE_DIR,path.basename(imagePath)));
+ let p=String(imagePath).trim();
+ if(!p.startsWith("/")&&(p.startsWith("images/")||p.startsWith("menu-images/")))p="/"+p;
+ if(/^\/images\/[A-Za-z0-9_.-]+\.(?:jpe?g|png|webp)$/i.test(p))return fs.existsSync(path.join(__dirname,"public",p.slice(1)));
+ if(/^\/menu-images\/[A-Za-z0-9_.-]+\.(?:jpe?g|png|webp)$/i.test(p))return fs.existsSync(path.join(MENU_IMAGE_DIR,path.basename(p)));
  return false;
 }
+function inferKind(categoryName,rawKind){
+ if(rawKind&&["USHQIM","PIJE","KAFE","EMBELSIRE","SHTESE"].includes(String(rawKind).toUpperCase()))return String(rawKind).toUpperCase();
+ const c=String(categoryName||"").toLowerCase();
+ if(c.includes("pije"))return "PIJE";
+ if(c.includes("kafe")||c.includes("çaj")||c.includes("qaj"))return "KAFE";
+ if(c.includes("ëmbëlsir")||c.includes("embelsir")||c.includes("tort"))return "EMBELSIRE";
+ if(c.includes("shtes"))return "SHTESE";
+ return "USHQIM";
+}
+const PRESET_IMAGES=[
+ {name:"Hamburger",path:"/images/burger-sandwich.jpg",category:"Mish dhe Ushqim"},
+ {name:"Burger mish i bardhë",path:"/images/burger-mish-i-bardh.jpg",category:"Mish dhe Ushqim"},
+ {name:"Pica",path:"/images/pizza.jpg",category:"Mish dhe Ushqim"},
+ {name:"Qebap",path:"/images/qebap.jpg",category:"Mish dhe Ushqim"},
+ {name:"Kombinim Skare / Pjatë",path:"/images/grill-platter.jpg",category:"Mish dhe Ushqim"},
+ {name:"Pule e Pjekur / File",path:"/images/grilled-chicken.jpg",category:"Mish dhe Ushqim"},
+ {name:"Sandwich Tuna",path:"/images/tuna-sandwich.jpg",category:"Mish dhe Ushqim"},
+ {name:"Pomfrit",path:"/images/pomfrit.jpg",category:"Shtesa"},
+ {name:"Suxhuk",path:"/images/suxhuk.jpg",category:"Shtesa"},
+ {name:"Extra Djathë",path:"/images/extra-djath.jpg",category:"Shtesa"},
+ {name:"Qepë",path:"/images/qepa.jpg",category:"Shtesa"},
+ {name:"Spec i Pjekur",path:"/images/spec-i-pjekur.jpg",category:"Shtesa"},
+ {name:"Domate & Tranguj",path:"/images/domat-tranguj.jpg",category:"Shtesa"},
+ {name:"Trileqe",path:"/images/trileqe.jpg",category:"Ëmbëlsira"},
+ {name:"Tortë Snikers",path:"/images/snickers-cake.jpg",category:"Ëmbëlsira"},
+ {name:"Kafe",path:"/images/coffee.jpg",category:"Pije"},
+ {name:"Çaj",path:"/images/tea.jpg",category:"Pije"},
+ {name:"Coca-Cola",path:"/images/coca-cola.jpg",category:"Pije"},
+ {name:"Fanta",path:"/images/fanta.jpg",category:"Pije"},
+ {name:"Schweppes",path:"/images/schwepps.png",category:"Pije"},
+ {name:"Lëng Frutash",path:"/images/juice.jpg",category:"Pije"},
+ {name:"Multisola",path:"/images/multisola.jpg",category:"Pije"},
+ {name:"Ice Tea",path:"/images/ice-tea.png",category:"Pije"},
+ {name:"Golden Eagle",path:"/images/golden-eagle.jpg",category:"Pije"},
+ {name:"Red Bull",path:"/images/red-bull.jpg",category:"Pije"},
+ {name:"Birra Peje",path:"/images/birra-peja.jpg",category:"Pije"},
+ {name:"Heineken",path:"/images/heineken.jpg",category:"Pije"},
+ {name:"Bavaria",path:"/images/bavaria.jpg",category:"Pije"},
+ {name:"Laqko",path:"/images/lasko.jpg",category:"Pije"},
+ {name:"Ice Smirnof",path:"/images/smirnoff-ice.jpg",category:"Pije"},
+ {name:"Jägermeister",path:"/images/jagermeister.png",category:"Pije"},
+ {name:"Ujë Mokne",path:"/images/uje-mokne.png",category:"Pije"},
+ {name:"Laqin",path:"/images/laqin.png",category:"Pije"}
+];
+app.get("/api/admin/preset-images",admin,(q,r)=>r.json(PRESET_IMAGES));
+app.get("/api/admin/categories",admin,(q,r)=>{
+ const cats=db.prepare("SELECT c.*,(SELECT COUNT(*) FROM products p WHERE p.category_id=c.id) product_count FROM categories c ORDER BY c.display_order,c.id").all();
+ r.json(cats);
+});
+app.post("/api/admin/categories",admin,(q,r)=>{
+ const name=String(q.body.name||"").trim();
+ if(!name||name.length>50)return r.status(400).json({error:"Emri i kategorisë duhet të jetë 1–50 shenja."});
+ const existing=db.prepare("SELECT id,active FROM categories WHERE LOWER(name)=LOWER(?)").get(name);
+ if(existing){
+  if(!existing.active){
+   db.prepare("UPDATE categories SET active=1 WHERE id=?").run(existing.id);
+   audit(q.session.user.id,"CATEGORY_REACTIVATED","CATEGORY",existing.id,{name});
+   return r.status(200).json({ok:true,id:existing.id,reactivated:true});
+  }
+  return r.status(409).json({error:"Kjo kategori ekziston tashmë."});
+ }
+ const maxOrder=db.prepare("SELECT COALESCE(MAX(display_order),0)+1 n FROM categories").get().n;
+ const displayOrder=Number.isInteger(Number(q.body.display_order))?Number(q.body.display_order):maxOrder;
+ const res=db.prepare("INSERT INTO categories(name,display_order,active) VALUES(?,?,1)").run(name,displayOrder);
+ audit(q.session.user.id,"CATEGORY_CREATED","CATEGORY",res.lastInsertRowid,{name,display_order:displayOrder});
+ r.status(201).json({ok:true,id:res.lastInsertRowid,name,display_order:displayOrder});
+});
+const handleCreateProduct=(q,r)=>{
+ const name=String(q.body.name||"").trim();
+ if(!name||name.length>100)return r.status(400).json({error:"Emri i produktit duhet të jetë 1–100 shenja."});
+ const categoryId=Number(q.body.category_id);
+ const category=db.prepare("SELECT * FROM categories WHERE id=? AND active=1").get(categoryId);
+ if(!Number.isInteger(categoryId)||!category)return r.status(400).json({error:"Zgjidhni një kategori të vlefshme."});
+ let price=Number(q.body.price_cents);
+ if((!Number.isInteger(price)||price<1)&&q.body.price!=null){
+  const parsed=Number(String(q.body.price).replace(",",".").trim());
+  if(Number.isFinite(parsed)&&parsed>0)price=Math.round(parsed*100);
+ }
+ if(!Number.isInteger(price)||price<1||price>10000000)return r.status(400).json({error:"Çmimi duhet të jetë të paktën 0.01€."});
+ let displayOrder=Number(q.body.display_order);
+ if(!Number.isInteger(displayOrder)||displayOrder<0||displayOrder>9999){
+  const nextOrder=db.prepare("SELECT COALESCE(MAX(display_order),0)+1 n FROM products WHERE category_id=?").get(categoryId).n;
+  displayOrder=nextOrder;
+ }
+ let imagePath=String(q.body.image_path||"").trim();
+ if(imagePath&&!imagePath.startsWith("/")&&(imagePath.startsWith("images/")||imagePath.startsWith("menu-images/")))imagePath="/"+imagePath;
+ if(!validMenuImagePath(imagePath))return r.status(400).json({error:"Fotoja duhet të jetë imazh lokal i ngarkuar ose i zgjedhur."});
+ const active=q.body.active===undefined||q.body.active===null||q.body.active===true||q.body.active===1||q.body.active==="1";
+ const kind=inferKind(category.name,q.body.kind);
+ const dup=db.prepare("SELECT id FROM products WHERE LOWER(name)=LOWER(?) AND active=1").get(name);
+ if(dup)return r.status(409).json({error:"Një produkt aktiv me emrin \""+name+"\" ekziston tashmë."});
+ const initialStock=q.body.initial_stock||null;
+ const tx=db.transaction(()=>{
+  const ins=db.prepare("INSERT INTO products(name,category_id,price_cents,kind,active,display_order,image_path) VALUES(?,?,?,?,?,?,?)").run(name,categoryId,price,kind,active?1:0,displayOrder,imagePath||null);
+  const newId=ins.lastInsertRowid;
+  if(initialStock&&(initialStock.track||Number.isFinite(Number(initialStock.quantity)))){
+   const qty=Math.max(0,Number(initialStock.quantity)||0);
+   const units=["copë","shishe","porcion","kg","l","pako"];
+   const unit=units.includes(initialStock.unit)?initialStock.unit:"copë";
+   const threshold=Math.max(0,Number(initialStock.low_stock_threshold)||5);
+   db.prepare("INSERT INTO inventory(product_id,quantity,unit,low_stock_threshold,updated_at) VALUES(?,?,?,?,?)").run(newId,qty,unit,threshold,now());
+   if(qty>0)db.prepare("INSERT INTO inventory_movements(product_id,actor_id,quantity_delta,reason,created_at) VALUES(?,?,?,?,?)").run(newId,q.session.user.id,qty,"ADMIN_TRACK_START",now());
+  }
+  audit(q.session.user.id,"MENU_PRODUCT_CREATED","PRODUCT",newId,{name,price_cents:price,category_id:categoryId,kind,active,image_path:imagePath||null});
+  return newId;
+ });
+ const newId=tx();
+ const created=db.prepare(menuProductQuery+" WHERE p.id=?").get(newId);
+ r.status(201).json({ok:true,id:newId,product:created});
+};
+app.post("/api/admin/menu",admin,handleCreateProduct);
+app.post("/api/admin/products",admin,handleCreateProduct);
 app.patch("/api/admin/menu/:id",admin,(q,r)=>{
  const id=Number(q.params.id),old=db.prepare("SELECT * FROM products WHERE id=?").get(id);
  if(!old)return r.status(404).json({error:"Produkti nuk u gjet."});
- const name=String(q.body.name||"").trim(),categoryId=Number(q.body.category_id),price=Number(q.body.price_cents),active=q.body.active===true||q.body.active===1||q.body.active==="1",displayOrder=Number(q.body.display_order);
- const imagePath=String(q.body.image_path||"").trim();
+ const name=String(q.body.name||"").trim(),categoryId=Number(q.body.category_id);
+ let price=Number(q.body.price_cents);
+ if((!Number.isInteger(price)||price<1)&&q.body.price!=null){
+  const parsed=Number(String(q.body.price).replace(",",".").trim());
+  if(Number.isFinite(parsed)&&parsed>0)price=Math.round(parsed*100);
+ }
+ const active=q.body.active===true||q.body.active===1||q.body.active==="1";
+ const displayOrder=Number(q.body.display_order);
+ let imagePath=String(q.body.image_path||"").trim();
+ if(imagePath&&!imagePath.startsWith("/")&&(imagePath.startsWith("images/")||imagePath.startsWith("menu-images/")))imagePath="/"+imagePath;
  if(!name||name.length>100)return r.status(400).json({error:"Emri duhet të jetë 1–100 shenja."});
- if(!Number.isInteger(categoryId)||!db.prepare("SELECT id FROM categories WHERE id=? AND active=1").get(categoryId))return r.status(400).json({error:"Kategoria nuk është e vlefshme."});
+ const category=db.prepare("SELECT id,name FROM categories WHERE id=? AND active=1").get(categoryId);
+ if(!Number.isInteger(categoryId)||!category)return r.status(400).json({error:"Kategoria nuk është e vlefshme."});
  if(!Number.isInteger(price)||price<1||price>10000000)return r.status(400).json({error:"Çmimi nuk është i vlefshëm."});
  if(!Number.isInteger(displayOrder)||displayOrder<0||displayOrder>9999)return r.status(400).json({error:"Renditja nuk është e vlefshme."});
  if(!validMenuImagePath(imagePath))return r.status(400).json({error:"Fotoja duhet të jetë imazh lokal i ngarkuar ose i zgjedhur."});
- db.prepare("UPDATE products SET name=?,category_id=?,price_cents=?,active=?,display_order=?,image_path=? WHERE id=?").run(name,categoryId,price,active?1:0,displayOrder,imagePath||null,id);
- audit(q.session.user.id,"MENU_PRODUCT_UPDATED","PRODUCT",id,{name,price_cents:price,active,image_path:imagePath||null});
+ const rawKind=q.body.kind?String(q.body.kind).toUpperCase():null;
+ const kind=["USHQIM","PIJE","KAFE","EMBELSIRE","SHTESE"].includes(rawKind)?rawKind:(old.kind||inferKind(category.name));
+ db.prepare("UPDATE products SET name=?,category_id=?,price_cents=?,kind=?,active=?,display_order=?,image_path=? WHERE id=?").run(name,categoryId,price,kind,active?1:0,displayOrder,imagePath||null,id);
+ audit(q.session.user.id,"MENU_PRODUCT_UPDATED","PRODUCT",id,{name,price_cents:price,category_id:categoryId,kind,active,image_path:imagePath||null});
  r.json({ok:true});
 });
+const handleDeleteProduct=(q,r)=>{
+ const id=Number(q.params.id);
+ const p=db.prepare("SELECT * FROM products WHERE id=?").get(id);
+ if(!p)return r.status(404).json({error:"Produkti nuk u gjet."});
+ const activeUsage=db.prepare("SELECT o.order_number FROM order_items i JOIN orders o ON o.id=i.order_id WHERE i.product_id=? AND o.status IN ('ACTIVE','PAYMENT_PENDING') LIMIT 1").get(id);
+ if(activeUsage)return r.status(409).json({error:"Produkti nuk mund të fshihet sepse ndodhet në porosinë aktive #"+activeUsage.order_number+". Përfundoni ose hiqeni nga porosia para fshirjes."});
+ const tx=db.transaction(()=>{
+  db.prepare("DELETE FROM inventory_movements WHERE product_id=?").run(id);
+  db.prepare("DELETE FROM inventory WHERE product_id=?").run(id);
+  db.prepare("DELETE FROM products WHERE id=?").run(id);
+  audit(q.session.user.id,"MENU_PRODUCT_DELETED","PRODUCT",id,{name:p.name,price_cents:p.price_cents,category_id:p.category_id});
+ });
+ tx();
+ r.json({ok:true,message:"Produkti \""+p.name+"\" u fshi me sukses."});
+};
+app.delete("/api/admin/menu/:id",admin,handleDeleteProduct);
+app.delete("/api/admin/products/:id",admin,handleDeleteProduct);
 app.post("/api/admin/menu-image",admin,async(q,r)=>{
  const match=/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(q.body.dataUrl||""));
  if(!match)return r.status(400).json({error:"Ngarko një fotografi PNG, JPG ose WebP."});
