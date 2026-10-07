@@ -120,20 +120,542 @@ async function admin(){var s=await api('/api/statistika');renderAdmin(s)}
 function renderAdmin(s){set(head('Administratë')+'<main class="main"><div class="hero"><div><h1>Administrata</h1><p>Porosi, menu, stok, raporte dhe shërbimi.</p></div></div><div class="admin"><aside class="card side admin-side"><button class="'+(S.adminTab==='panel'?'active':'')+'" onclick="S.adminTab=\'panel\';admin()">Paneli</button><button class="'+(S.adminTab==='historiku'?'active':'')+'" onclick="S.adminTab=\'historiku\';adminTab()">Pagesat / Borxhet</button><button class="'+(S.adminTab==='anulimet'?'active':'')+'" onclick="S.adminTab=\'anulimet\';adminTab()">Kërkesat për anulim</button><button class="'+(S.adminTab==='gjurmet'?'active':'')+'" onclick="S.adminTab=\'gjurmet\';adminTab()">Gjurmët</button><div class="side-divider"></div><button class="'+(S.adminTab==='menu'?'active':'')+'" onclick="S.adminTab=\'menu\';adminTab()">Menuja</button><button class="'+(S.adminTab==='stock'?'active':'')+'" onclick="S.adminTab=\'stock\';adminTab()">Stoku</button><button class="'+(S.adminTab==='reports'?'active':'')+'" onclick="S.adminTab=\'reports\';adminTab()">Raportet</button><button class="'+(S.adminTab==='qr'?'active':'')+'" onclick="S.adminTab=\'qr\';adminTab()">QR Menu</button></aside><section id="adminContent"></section></div></main>');adminTab(s)}
 async function adminTab(s){var el=document.getElementById('adminContent');if(!el)return;if(S.adminTab==='panel'){s=s||await api('/api/statistika');el.innerHTML='<div class="grid"><div class="card stat"><b>'+s.revenue+'</b><span class="muted">Të hyra sot</span></div><div class="card stat"><b>'+s.paid+'</b><span class="muted">Porosi të paguara</span></div><div class="card stat"><b>'+s.total+'</b><span class="muted">Porosi sot</span></div><div class="card stat"><b>'+s.cancelled+'</b><span class="muted">Të anuluara</span></div></div><div class="section card" style="padding:18px"><h2>Produktet më të shitura</h2><div class="tableWrap"><table class="table"><tr><th>Produkt</th><th>Sasia</th></tr>'+s.top.map(function(x){return '<tr><td>'+esc(x.name)+'</td><td>'+x.quantity+'</td></tr>'}).join('')+'</table></div></div>';return}if(S.adminTab==='historiku'){var rows=await api('/api/historiku');S.historyRows=rows;el.innerHTML='<div class="card" style="padding:18px"><div class="row"><div><h2>Pagesat dhe borxhet</h2><p class="muted">Të gjitha porositë, të paguarat dhe të papaguarat me datë, orë dhe produkte.</p></div><input id="search" style="max-width:320px" placeholder="Kërko porosi, tavolinë, emër..." oninput="searchHistory()"></div><div class="cats" style="margin:15px 0"><button class="btn '+(S.historyFilter==='ALL'?'primary':'')+'" onclick="setHistoryFilter(\'ALL\')">Të gjitha</button><button class="btn '+(S.historyFilter==='UNPAID'?'primary':'')+'" onclick="setHistoryFilter(\'UNPAID\')">Të papaguara</button><button class="btn '+(S.historyFilter==='PAID'?'primary':'')+'" onclick="setHistoryFilter(\'PAID\')">Të paguara</button><button class="btn '+(S.historyFilter==='CANCELLED'?'primary':'')+'" onclick="setHistoryFilter(\'CANCELLED\')">Të anuluara</button></div><div id="hist" class="tableWrap" style="margin-top:14px">'+hist(rows)+'</div></div>';return}if(S.adminTab==='anulimet'){var requests=await api('/api/anulimet');el.innerHTML='<div class="card cancellation-queue" style="padding:18px"><div><h2>Kërkesat për anulim</h2><p class="muted">Shqyrtoni arsyen për secilën porosi. Vetëm pas miratimit hiqet nga porositë aktive; historiku ruhet.</p></div>'+(requests.length?'<div class="cancellation-list">'+requests.map(function(x){var where=x.table_number?'Tavolina '+x.table_number:(x.custom_identifier||(x.order_type==='ME_VETI'?'Me veti':'Për këtu'));return '<article class="card cancellation-card"><div class="request-top"><div><span class="tag cancel-pending">NË PRITJE</span><h3>Porosia #'+x.order_number+' · '+esc(where)+'</h3></div><strong class="money">'+eur(x.total_cents)+'</strong></div><div class="request-meta"><span>Kërkoi <b>'+esc(x.requested_by_name||x.waiter_name)+'</b></span><time>'+dt(x.created_at)+'</time></div><div class="request-reason"><b>Arsyeja:</b> '+esc(x.reason)+'</div><div class="row request-actions"><button class="btn red" onclick="reviewCancellation('+x.id+',\'APPROVE\')">Prano dhe anulo</button><button class="btn" onclick="reviewCancellation('+x.id+',\'REJECT\')">Refuzo</button></div></article>'}).join('')+'</div>':'<div class="empty">Nuk ka kërkesa për anulim në pritje.</div>')+'</div>';return}if(S.adminTab==='menu'){await adminMenuTab(el);return}if(S.adminTab==='stock'){await adminStockTab(el);return}if(S.adminTab==='reports'){await adminReportsTab(el);return}if(S.adminTab==='qr'){adminQrTab(el);return}var a=await api('/api/audit');el.innerHTML='<div class="card" style="padding:18px"><h2>Gjurmët e sistemit</h2><div class="tableWrap"><table class="table"><tr><th>Ora</th><th>Përdoruesi</th><th>Veprimi</th><th>Objekti</th></tr>'+a.map(function(x){return '<tr><td>'+dt(x.created_at)+'</td><td>'+esc(x.actor_name||'Sistem')+'</td><td>'+esc(x.action)+'</td><td>'+esc(x.entity_type||'')+' '+(x.entity_id||'')+'</td></tr>'}).join('')+'</table></div></div>'}
 function fileDataUrl(file){return new Promise(function(resolve,reject){var reader=new FileReader();reader.onload=function(){resolve(reader.result)};reader.onerror=reject;reader.readAsDataURL(file)})}
+var PRESET_IMAGES=[
+ {name:"Hamburger",path:"/images/burger-sandwich.jpg"},
+ {name:"Burger mish i bardhë",path:"/images/burger-mish-i-bardh.jpg"},
+ {name:"Pica",path:"/images/pizza.jpg"},
+ {name:"Qebap",path:"/images/qebap.jpg"},
+ {name:"Kombinim Skare / Pjatë",path:"/images/grill-platter.jpg"},
+ {name:"Pule e Pjekur / File",path:"/images/grilled-chicken.jpg"},
+ {name:"Sandwich Tuna",path:"/images/tuna-sandwich.jpg"},
+ {name:"Pomfrit",path:"/images/pomfrit.jpg"},
+ {name:"Suxhuk",path:"/images/suxhuk.jpg"},
+ {name:"Extra Djathë",path:"/images/extra-djath.jpg"},
+ {name:"Qepë",path:"/images/qepa.jpg"},
+ {name:"Spec i Pjekur",path:"/images/spec-i-pjekur.jpg"},
+ {name:"Domate & Tranguj",path:"/images/domat-tranguj.jpg"},
+ {name:"Trileqe",path:"/images/trileqe.jpg"},
+ {name:"Tortë Snikers",path:"/images/snickers-cake.jpg"},
+ {name:"Kafe",path:"/images/coffee.jpg"},
+ {name:"Çaj",path:"/images/tea.jpg"},
+ {name:"Coca-Cola",path:"/images/coca-cola.jpg"},
+ {name:"Fanta",path:"/images/fanta.jpg"},
+ {name:"Schweppes",path:"/images/schwepps.png"},
+ {name:"Lëng Frutash",path:"/images/juice.jpg"},
+ {name:"Multisola",path:"/images/multisola.jpg"},
+ {name:"Ice Tea",path:"/images/ice-tea.png"},
+ {name:"Golden Eagle",path:"/images/golden-eagle.jpg"},
+ {name:"Red Bull",path:"/images/red-bull.jpg"},
+ {name:"Birra Peje",path:"/images/birra-peja.jpg"},
+ {name:"Heineken",path:"/images/heineken.jpg"},
+ {name:"Bavaria",path:"/images/bavaria.jpg"},
+ {name:"Laqko",path:"/images/lasko.jpg"},
+ {name:"Ice Smirnof",path:"/images/smirnoff-ice.jpg"},
+ {name:"Jägermeister",path:"/images/jagermeister.png"},
+ {name:"Ujë Mokne",path:"/images/uje-mokne.png"},
+ {name:"Laqin",path:"/images/laqin.png"}
+];
+S.menuSearch=S.menuSearch||'';
+S.menuCatFilter=S.menuCatFilter||'all';
+S.menuStatusFilter=S.menuStatusFilter||'all';
+
 async function adminMenuTab(el){
+ el=el||document.getElementById('adminContent');if(!el)return;
  var data=await api('/api/admin/menu');S.adminMenu=data;
- var rows=data.products.map(function(p){var photo=productPhoto(p)||{},categoryOptions=data.categories.map(function(c){return '<option value="'+c.id+'" '+(c.id===p.category_id?'selected':'')+'>'+esc(c.name)+'</option>'}).join('');return '<tr><td><input id="menu-name-'+p.id+'" value="'+esc(p.name)+'" maxlength="100" aria-label="Emri i produktit"></td><td><div class="price-input"><input id="menu-price-'+p.id+'" type="number" min="0.01" step="0.01" value="'+(p.price_cents/100).toFixed(2)+'" aria-label="Çmimi në euro"><span>€</span></div></td><td><select id="menu-category-'+p.id+'" aria-label="Kategoria">'+categoryOptions+'</select></td><td><label class="active-toggle"><input id="menu-active-'+p.id+'" type="checkbox" '+(p.active?'checked':'')+'> Aktiv</label></td><td class="menu-photo-cell"><img id="menu-preview-'+p.id+'" class="menu-photo-preview" src="'+esc(photo.src||'/images/grill-platter.jpg')+'" alt="Foto '+esc(p.name)+'" onerror="this.src=\'/images/grill-platter.jpg\'"><input class="image-path-input" id="menu-image-path-'+p.id+'" value="'+esc(p.image_path||'')+'" placeholder="Foto standarde" aria-label="Rruga e fotos"><input class="menu-file-input" id="menu-file-'+p.id+'" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Ngarko fotografi"><button class="btn upload-btn" type="button" onclick="uploadMenuPhoto('+p.id+')">Ngarko foto</button></td><td><input id="menu-order-'+p.id+'" type="number" min="0" max="9999" value="'+p.display_order+'" aria-label="Renditja"></td><td><button class="btn primary" type="button" onclick="saveMenuProduct('+p.id+')">Ruaj</button></td></tr>'}).join('');
- el.innerHTML='<div class="card menu-editor"><div class="admin-feature-heading"><div><h2>Menaxho menynë</h2><p class="muted">Përditëso çmimin, emrin, kategorinë, foton ose disponueshmërinë. Çmimet futen në euro.</p></div><span class="tag">'+data.products.length+' PRODUKTE</span></div><div class="tableWrap"><table class="table menu-editor-table"><thead><tr><th>Produkt</th><th>Çmimi</th><th>Kategoria</th><th>Gjendja</th><th>Fotoja</th><th>Renditja</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+ renderMenuEditor(el);
 }
-async function saveMenuProduct(id){
- var name=document.getElementById('menu-name-'+id).value.trim(),price=Number(document.getElementById('menu-price-'+id).value),category=Number(document.getElementById('menu-category-'+id).value),active=document.getElementById('menu-active-'+id).checked,displayOrder=Number(document.getElementById('menu-order-'+id).value),imagePath=document.getElementById('menu-image-path-'+id).value.trim();
- if(!name||!Number.isFinite(price)||price<=0)return toast('Shkruani emrin dhe çmimin e vlefshëm.');
- try{await api('/api/admin/menu/'+id,{method:'PATCH',body:JSON.stringify({name:name,price_cents:Math.round(price*100),category_id:category,active:active,display_order:displayOrder,image_path:imagePath})});toast('Produkti u ruajt.');await adminMenuTab(document.getElementById('adminContent'))}catch(e){toast(e.message)}
+
+function renderMenuEditor(el){
+ el=el||document.getElementById('adminContent');if(!el)return;
+ var data=S.adminMenu;if(!data)return;
+ var q=(S.menuSearch||'').trim().toLowerCase();
+ var catFilter=String(S.menuCatFilter||'all');
+ var statusFilter=String(S.menuStatusFilter||'all');
+ 
+ var filtered=data.products.filter(function(p){
+  var matchesQ=!q||(p.name||'').toLowerCase().includes(q);
+  var matchesCat=catFilter==='all'||String(p.category_id)===catFilter;
+  var matchesStatus=statusFilter==='all'||(statusFilter==='active'&&p.active)||(statusFilter==='inactive'&&!p.active);
+  return matchesQ&&matchesCat&&matchesStatus;
+ });
+ 
+ var activeCount=data.products.filter(function(p){return p.active}).length;
+ var categoryPills=[{id:'all',name:'Të gjitha',count:data.products.length}].concat(data.categories.map(function(c){
+  return {id:String(c.id),name:c.name,count:data.products.filter(function(p){return p.category_id===c.id}).length};
+ }));
+ 
+ var catTabsHtml='<div class="menu-cat-tabs">'+categoryPills.map(function(cp){
+  return '<button type="button" class="btn menu-cat-tab-btn '+(catFilter===String(cp.id)?'primary':'')+'" onclick="setMenuCatFilter(\''+cp.id+'\')">'+esc(cp.name)+' <span class="badge">'+cp.count+'</span></button>';
+ }).join('')+'</div>';
+ 
+ var kinds=[
+  {val:'USHQIM',label:'Ushqim (Kuzhinë)'},
+  {val:'EMBELSIRE',label:'Ëmbëlsirë (Kuzhinë)'},
+  {val:'PIJE',label:'Pije (Bar)'},
+  {val:'KAFE',label:'Kafe / Çaj'},
+  {val:'SHTESE',label:'Shtesë'}
+ ];
+ 
+ var rows=filtered.map(function(p){
+  var photo=productPhoto(p)||{};
+  var categoryOptions=data.categories.map(function(c){
+   return '<option value="'+c.id+'" '+(c.id===p.category_id?'selected':'')+'>'+esc(c.name)+'</option>';
+  }).join('');
+  var kindOptions=kinds.map(function(k){
+   return '<option value="'+k.val+'" '+(k.val===(p.kind||'USHQIM')?'selected':'')+'>'+esc(k.label)+'</option>';
+  }).join('');
+  
+  return '<tr id="menu-row-'+p.id+'" class="'+(p.active?'':'is-inactive')+'">'+
+   '<td><input id="menu-name-'+p.id+'" value="'+esc(p.name)+'" maxlength="100" aria-label="Emri i produktit" style="min-width:140px"></td>'+
+   '<td><div class="price-input"><input id="menu-price-'+p.id+'" type="number" min="0.01" step="0.01" value="'+(p.price_cents/100).toFixed(2)+'" aria-label="Çmimi në euro" style="width:75px"><span>€</span></div></td>'+
+   '<td><select id="menu-category-'+p.id+'" aria-label="Kategoria" style="min-width:125px">'+categoryOptions+'</select></td>'+
+   '<td><select id="menu-kind-'+p.id+'" aria-label="Lloji" style="min-width:120px">'+kindOptions+'</select></td>'+
+   '<td><label class="active-toggle"><input id="menu-active-'+p.id+'" type="checkbox" '+(p.active?'checked':'')+'> Aktiv</label></td>'+
+   '<td class="menu-photo-cell">'+
+     '<div class="menu-photo-box">'+
+       '<img id="menu-preview-'+p.id+'" class="menu-photo-preview" src="'+esc(photo.src||'/images/grill-platter.jpg')+'" alt="Foto '+esc(p.name)+'" onerror="this.src=\'/images/grill-platter.jpg\'">'+
+       '<div class="menu-photo-controls">'+
+         '<input class="image-path-input" id="menu-image-path-'+p.id+'" value="'+esc(p.image_path||'')+'" placeholder="Foto standarde" aria-label="Rruga e fotos">'+
+         '<div class="photo-btn-group">'+
+           '<input class="menu-file-input" id="menu-file-'+p.id+'" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Ngarko fotografi" style="display:none" onchange="uploadMenuPhoto('+p.id+')">'+
+           '<button class="btn upload-btn" type="button" onclick="document.getElementById(\'menu-file-'+p.id+'\').click()">Ngarko</button>'+
+           '<button class="btn preset-btn" type="button" onclick="openPhotoPickerForProduct('+p.id+')">Librari</button>'+
+         '</div>'+
+       '</div>'+
+     '</div>'+
+   '</td>'+
+   '<td><input id="menu-order-'+p.id+'" type="number" min="0" max="9999" value="'+p.display_order+'" aria-label="Renditja" style="width:65px"></td>'+
+   '<td><div class="menu-row-actions"><button class="btn primary" type="button" onclick="saveMenuProduct('+p.id+')">Ruaj</button><button class="btn red" type="button" onclick="askDeleteMenuProduct('+p.id+',\''+esc(p.name).replace(/'/g,"\\'")+'\','+p.price_cents+')">Fshij</button></div></td>'+
+  '</tr>';
+ }).join('');
+
+ el.innerHTML='<div class="card menu-editor">'+
+  '<div class="admin-feature-heading">'+
+    '<div>'+
+      '<h2>Menaxho menynë</h2>'+
+      '<p class="muted">Krijo produkte të reja, vendos emrin, foton, çmimin, llojin, kategorinë dhe fshij ose modifiko produktet ekzistuese.</p>'+
+    '</div>'+
+    '<div class="menu-header-badges">'+
+      '<span class="tag">'+data.products.length+' PRODUKTE TOTAL</span>'+
+      '<span class="tag ok">'+activeCount+' AKTIVE</span>'+
+    '</div>'+
+  '</div>'+
+  '<div class="menu-editor-toolbar">'+
+    '<div class="menu-toolbar-actions">'+
+      '<button type="button" class="btn primary big add-product-btn" onclick="openCreateProductModal()">+ SHTO PRODUKT TË RI</button>'+
+      '<button type="button" class="btn" onclick="openCreateCategoryModal()">+ Kategori e re</button>'+
+    '</div>'+
+    '<div class="menu-toolbar-search">'+
+      '<input type="search" id="admin-menu-search" placeholder="Kërko sipas emrit..." value="'+esc(S.menuSearch)+'" oninput="onMenuSearch(this.value)">'+
+      '<select id="admin-menu-status-filter" onchange="setMenuStatusFilter(this.value)">'+
+        '<option value="all" '+(statusFilter==='all'?'selected':'')+'>Të gjitha gjendjet</option>'+
+        '<option value="active" '+(statusFilter==='active'?'selected':'')+'>Vetëm aktive</option>'+
+        '<option value="inactive" '+(statusFilter==='inactive'?'selected':'')+'>Vetëm joaktive</option>'+
+      '</select>'+
+    '</div>'+
+  '</div>'+
+  catTabsHtml+
+  '<div class="tableWrap" style="margin-top:14px">'+
+    (filtered.length ?
+      '<table class="table menu-editor-table"><thead><tr><th>Produkt</th><th>Çmimi</th><th>Kategoria</th><th>Lloji</th><th>Gjendja</th><th>Fotoja</th><th>Renditja</th><th>Veprimet</th></tr></thead><tbody>'+rows+'</tbody></table>'
+      : '<div class="empty">Nuk u gjet asnjë produkt me këto filtra.</div>'
+    )+
+  '</div>'+
+ '</div>';
 }
-async function uploadMenuPhoto(id){
- var field=document.getElementById('menu-file-'+id),file=field&&field.files&&field.files[0];if(!file)return toast('Zgjidhni një fotografi fillimisht.');
+
+function onMenuSearch(val){
+ S.menuSearch=val;
+ var el=document.getElementById('adminContent');
+ if(el)renderMenuEditor(el);
+ var input=document.getElementById('admin-menu-search');
+ if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length);}
+}
+
+function setMenuCatFilter(catId){
+ S.menuCatFilter=catId;
+ renderMenuEditor(document.getElementById('adminContent'));
+}
+
+function setMenuStatusFilter(st){
+ S.menuStatusFilter=st;
+ renderMenuEditor(document.getElementById('adminContent'));
+}
+
+function openCreateProductModal(){
+ if(!S.adminMenu)return;
+ var cats=S.adminMenu.categories||[];
+ var catOptions=cats.map(function(c,i){return '<option value="'+c.id+'" '+(i===0?'selected':'')+'>'+esc(c.name)+'</option>'}).join('');
+ var nextOrder=S.adminMenu.products.length ? Math.max.apply(null,S.adminMenu.products.map(function(p){return p.display_order||0}))+1 : 1;
+ 
+ var defaultKind="USHQIM";
+ if(cats.length&&cats[0].name.toLowerCase().includes("pije")) defaultKind="PIJE";
+ 
+ var modalHtml='<div class="modalBack" id="createProductModal">'+
+   '<div class="modal create-product-modal">'+
+     '<div class="row" style="margin-bottom:14px">'+
+       '<div>'+
+         '<h2>Shto produkt të ri</h2>'+
+         '<p class="muted">Vendos emrin, çmimin, kategorinë, llojin, foton dhe stokun fillestar.</p>'+
+       '</div>'+
+       '<button type="button" class="btn" onclick="closeCreateProductModal()">✕</button>'+
+     '</div>'+
+     '<form onsubmit="submitCreateProduct(event)">'+
+       '<div class="create-prod-grid">'+
+         '<div class="create-prod-fields">'+
+           '<label for="new-prod-name">Emri i produktit *</label>'+
+           '<input id="new-prod-name" required maxlength="100" placeholder="P.sh. Burger Sharri, Çaj Kamomil..." autofocus>'+
+           '<div class="row" style="gap:12px;margin-top:10px">'+
+             '<div style="flex:1">'+
+               '<label for="new-prod-category">Kategoria *</label>'+
+               '<select id="new-prod-category" onchange="onNewProductCategoryChange()">'+catOptions+'</select>'+
+             '</div>'+
+             '<div style="flex:1">'+
+               '<label for="new-prod-price">Çmimi (€) *</label>'+
+               '<div class="price-input"><input id="new-prod-price" type="number" step="0.01" min="0.01" placeholder="2.50" required><span>€</span></div>'+
+             '</div>'+
+           '</div>'+
+           '<div class="row" style="gap:12px;margin-top:10px">'+
+             '<div style="flex:1">'+
+               '<label for="new-prod-kind">Lloji (Kuzhina / POS)</label>'+
+               '<select id="new-prod-kind">'+
+                 '<option value="USHQIM" '+(defaultKind==="USHQIM"?'selected':'')+'>Ushqim (shfaqet në Kuzhinë)</option>'+
+                 '<option value="EMBELSIRE" '+(defaultKind==="EMBELSIRE"?'selected':'')+'>Ëmbëlsirë (Kuzhinë)</option>'+
+                 '<option value="PIJE" '+(defaultKind==="PIJE"?'selected':'')+'>Pije (Bar/Pije)</option>'+
+                 '<option value="KAFE" '+(defaultKind==="KAFE"?'selected':'')+'>Kafe / Çaj</option>'+
+                 '<option value="SHTESE" '+(defaultKind==="SHTESE"?'selected':'')+'>Shtesë (suxhuk, spec...)</option>'+
+               '</select>'+
+             '</div>'+
+             '<div style="flex:1">'+
+               '<label for="new-prod-order">Renditja</label>'+
+               '<input id="new-prod-order" type="number" min="0" max="9999" value="'+nextOrder+'">'+
+             '</div>'+
+           '</div>'+
+           '<div style="margin-top:14px">'+
+             '<label class="active-toggle"><input id="new-prod-active" type="checkbox" checked> Aktiv menjëherë në sistem dhe menynë QR</label>'+
+           '</div>'+
+           '<div class="create-stock-section" style="margin-top:16px;padding:12px;border:1px solid rgba(222,235,226,.1);border-radius:12px;background:rgba(20,27,24,.4)">'+
+             '<label class="active-toggle"><input id="new-prod-track-stock" type="checkbox" onchange="toggleNewProductStockFields()"> Ndiq stokun fillestar për këtë produkt</label>'+
+             '<div id="new-prod-stock-fields" style="display:none;margin-top:10px;grid-template-columns:1fr 1fr 1fr;gap:10px">'+
+               '<div><label>Sasia fillestare</label><input id="new-prod-stock-qty" type="number" min="0" step="0.1" value="50"></div>'+
+               '<div><label>Njësia</label><select id="new-prod-stock-unit"><option selected>copë</option><option>shishe</option><option>porcion</option><option>kg</option><option>l</option><option>pako</option></select></div>'+
+               '<div><label>Pragu i ulët</label><input id="new-prod-stock-threshold" type="number" min="0" step="0.1" value="5"></div>'+
+             '</div>'+
+           '</div>'+
+         '</div>'+
+         '<div class="create-prod-photo-col">'+
+           '<label>Fotografia e produktit</label>'+
+           '<div class="create-photo-preview-wrap">'+
+             '<img id="new-prod-preview" class="create-photo-preview" src="/images/grill-platter.jpg" alt="Preview">'+
+             '<div class="create-photo-actions">'+
+               '<input type="file" id="new-prod-file-input" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="uploadNewProductPhoto()">'+
+               '<button type="button" class="btn upload-btn" onclick="document.getElementById(\'new-prod-file-input\').click()">Ngarko nga pajisja</button>'+
+               '<button type="button" class="btn" onclick="toggleNewProdPresets()">Zgjidh foto standarde</button>'+
+             '</div>'+
+             '<input id="new-prod-image-path" value="" placeholder="Rruga e fotos (opsionale)" style="margin-top:8px;font-size:11px" oninput="updateNewProdPreviewFromPath(this.value)">'+
+             '<div id="new-prod-presets-drawer" class="presets-drawer" style="display:none;margin-top:10px">'+
+               '<div class="presets-grid">'+
+                 PRESET_IMAGES.map(function(pi){
+                   return '<button type="button" class="preset-card" onclick="selectNewProdPreset(\''+pi.path+'\')"><img src="'+esc(pi.path)+'" alt="'+esc(pi.name)+'"><small>'+esc(pi.name)+'</small></button>';
+                 }).join('')+
+               '</div>'+
+             '</div>'+
+           '</div>'+
+         '</div>'+
+       '</div>'+
+       '<div id="new-prod-error" style="margin-top:10px"></div>'+
+       '<div class="row modal-actions" style="margin-top:20px;justify-content:flex-end;gap:10px">'+
+         '<button type="button" class="btn" onclick="closeCreateProductModal()">Anulo</button>'+
+         '<button type="submit" class="btn primary big" id="submit-new-prod-btn">Krijo produktin</button>'+
+       '</div>'+
+     '</form>'+
+   '</div>'+
+ '</div>';
+ document.body.insertAdjacentHTML('beforeend',modalHtml);
+}
+
+function closeCreateProductModal(){
+ var m=document.getElementById('createProductModal');
+ if(m)m.remove();
+}
+
+function onNewProductCategoryChange(){
+ var sel=document.getElementById('new-prod-category');
+ if(!sel||!S.adminMenu)return;
+ var catId=Number(sel.value);
+ var cat=S.adminMenu.categories.find(function(c){return c.id===catId});
+ var kindSel=document.getElementById('new-prod-kind');
+ var prev=document.getElementById('new-prod-preview');
+ if(!cat||!kindSel)return;
+ var name=cat.name.toLowerCase();
+ if(name.includes('pije')){kindSel.value='PIJE';if(prev&&!document.getElementById('new-prod-image-path').value)prev.src='/images/juice.jpg';}
+ else if(name.includes('ëmbëlsir')||name.includes('embelsir')){kindSel.value='EMBELSIRE';if(prev&&!document.getElementById('new-prod-image-path').value)prev.src='/images/trileqe.jpg';}
+ else if(name.includes('shtes')){kindSel.value='SHTESE';if(prev&&!document.getElementById('new-prod-image-path').value)prev.src='/images/pomfrit.jpg';}
+ else if(name.includes('kafe')){kindSel.value='KAFE';if(prev&&!document.getElementById('new-prod-image-path').value)prev.src='/images/coffee.jpg';}
+ else {kindSel.value='USHQIM';if(prev&&!document.getElementById('new-prod-image-path').value)prev.src='/images/grill-platter.jpg';}
+}
+
+function toggleNewProductStockFields(){
+ var checked=document.getElementById('new-prod-track-stock').checked;
+ var wrap=document.getElementById('new-prod-stock-fields');
+ if(wrap)wrap.style.display=checked?'grid':'none';
+}
+
+function toggleNewProdPresets(){
+ var d=document.getElementById('new-prod-presets-drawer');
+ if(d)d.style.display=d.style.display==='none'?'block':'none';
+}
+
+function selectNewProdPreset(path){
+ var pathInput=document.getElementById('new-prod-image-path');
+ var prev=document.getElementById('new-prod-preview');
+ if(pathInput)pathInput.value=path;
+ if(prev)prev.src=path;
+ var d=document.getElementById('new-prod-presets-drawer');
+ if(d)d.style.display='none';
+}
+
+function updateNewProdPreviewFromPath(path){
+ var prev=document.getElementById('new-prod-preview');
+ if(prev)prev.src=path||'/images/grill-platter.jpg';
+}
+
+async function uploadNewProductPhoto(){
+ var field=document.getElementById('new-prod-file-input'),file=field&&field.files&&field.files[0];
+ if(!file)return;
  if(file.size>3*1024*1024)return toast('Fotografia duhet të jetë maksimumi 3 MB.');
- try{var dataUrl=await fileDataUrl(file),result=await api('/api/admin/menu-image',{method:'POST',body:JSON.stringify({dataUrl:dataUrl})});document.getElementById('menu-image-path-'+id).value=result.path;document.getElementById('menu-preview-'+id).src=result.path;toast('Fotoja u ngarkua. Shtyp “Ruaj” për ta lidhur me produktin.')}catch(e){toast(e.message)}
+ try{
+   var dataUrl=await fileDataUrl(file);
+   var result=await api('/api/admin/menu-image',{method:'POST',body:JSON.stringify({dataUrl:dataUrl})});
+   var pathInput=document.getElementById('new-prod-image-path');
+   var prev=document.getElementById('new-prod-preview');
+   if(pathInput)pathInput.value=result.path;
+   if(prev)prev.src=result.path;
+   toast('Fotoja u ngarkua me sukses.');
+ }catch(e){toast(e.message)}
+}
+
+async function submitCreateProduct(e){
+ e.preventDefault();
+ var btn=document.getElementById('submit-new-prod-btn');
+ var errEl=document.getElementById('new-prod-error');
+ if(errEl)errEl.innerHTML='';
+ 
+ var name=document.getElementById('new-prod-name').value.trim();
+ var categoryId=Number(document.getElementById('new-prod-category').value);
+ var priceVal=Number(document.getElementById('new-prod-price').value);
+ var kind=document.getElementById('new-prod-kind').value;
+ var displayOrder=Number(document.getElementById('new-prod-order').value);
+ var active=document.getElementById('new-prod-active').checked;
+ var imagePath=document.getElementById('new-prod-image-path').value.trim();
+ 
+ if(!name)return toast('Shkruani emrin e produktit.');
+ if(!Number.isFinite(priceVal)||priceVal<=0)return toast('Shkruani një çmim të vlefshëm në euro.');
+ 
+ var payload={
+  name:name,
+  category_id:categoryId,
+  price_cents:Math.round(priceVal*100),
+  kind:kind,
+  display_order:displayOrder,
+  active:active,
+  image_path:imagePath||null
+ };
+ 
+ if(document.getElementById('new-prod-track-stock').checked){
+  payload.initial_stock={
+   track:true,
+   quantity:Number(document.getElementById('new-prod-stock-qty').value)||0,
+   unit:document.getElementById('new-prod-stock-unit').value||'copë',
+   low_stock_threshold:Number(document.getElementById('new-prod-stock-threshold').value)||5
+  };
+ }
+ 
+ if(btn){btn.disabled=true;btn.textContent='Duke krijuar...';}
+ try{
+  var res=await api('/api/admin/menu',{method:'POST',body:JSON.stringify(payload)});
+  closeCreateProductModal();
+  toast('Produkti "'+name+'" u krijua me sukses.');
+  await adminMenuTab(document.getElementById('adminContent'));
+ }catch(err){
+  if(btn){btn.disabled=false;btn.textContent='Krijo produktin';}
+  if(errEl)errEl.innerHTML='<div class="error">'+esc(err.message)+'</div>';
+  else toast(err.message);
+ }
+}
+
+function askDeleteMenuProduct(id,name,priceCents){
+ var modalHtml='<div class="modalBack" id="deleteProductModal">'+
+   '<div class="modal delete-product-modal">'+
+     '<div class="row" style="margin-bottom:12px">'+
+       '<div>'+
+         '<h2>Fshij produktin</h2>'+
+         '<p class="muted">A jeni të sigurt që dëshironi të fshini këtë produkt nga menyja?</p>'+
+       '</div>'+
+       '<button type="button" class="btn" onclick="closeDeleteModal()">✕</button>'+
+     '</div>'+
+     '<div class="delete-product-card" style="display:flex;align-items:center;gap:14px;padding:12px;border:1px solid rgba(223,114,112,.3);border-radius:14px;background:rgba(223,114,112,.08)">'+
+       '<span style="font-size:24px">🗑️</span>'+
+       '<div>'+
+         '<strong style="font-size:16px;color:#fff">'+esc(name)+'</strong>'+
+         '<span style="display:block;color:var(--gold-light);font-weight:800">'+eur(priceCents)+'</span>'+
+       '</div>'+
+     '</div>'+
+     '<p class="muted" style="margin:14px 0 0;font-size:12px;line-height:1.5">'+
+       '⚠️ Produkti do të hiqet menjëherë nga lista e kamarierëve dhe nga menuja publike QR. Historiku i porosive të kaluara nuk do të preket.'+
+     '</p>'+
+     '<div id="delete-prod-error" style="margin-top:10px"></div>'+
+     '<div class="row modal-actions" style="margin-top:20px;justify-content:flex-end;gap:10px">'+
+       '<button type="button" class="btn" onclick="closeDeleteModal()">Anulo</button>'+
+       '<button type="button" class="btn red" id="confirm-delete-btn" onclick="doDeleteMenuProduct('+id+')">Po, fshij produktin</button>'+
+     '</div>'+
+   '</div>'+
+ '</div>';
+ document.body.insertAdjacentHTML('beforeend',modalHtml);
+}
+
+function closeDeleteModal(){
+ var m=document.getElementById('deleteProductModal');
+ if(m)m.remove();
+}
+
+async function doDeleteMenuProduct(id){
+ var btn=document.getElementById('confirm-delete-btn');
+ var errEl=document.getElementById('delete-prod-error');
+ if(btn){btn.disabled=true;btn.textContent='Duke fshirë...';}
+ try{
+  var res=await api('/api/admin/menu/'+id,{method:'DELETE'});
+  closeDeleteModal();
+  toast(res.message||'Produkti u fshi me sukses.');
+  await adminMenuTab(document.getElementById('adminContent'));
+ }catch(err){
+  if(btn){btn.disabled=false;btn.textContent='Po, fshij produktin';}
+  if(errEl)errEl.innerHTML='<div class="error">'+esc(err.message)+'</div>';
+  else toast(err.message);
+ }
+}
+
+function openPhotoPickerForProduct(id){
+ var p=S.adminMenu&&S.adminMenu.products.find(function(x){return x.id===id});
+ var name=p?p.name:'Produkt';
+ var modalHtml='<div class="modalBack" id="productPhotoPickerModal">'+
+   '<div class="modal" style="max-width:680px">'+
+     '<div class="row" style="margin-bottom:14px">'+
+       '<div>'+
+         '<h2>Zgjidh foto nga libraria</h2>'+
+         '<p class="muted">Zgjidh një fotografi standarde për <b>'+esc(name)+'</b>.</p>'+
+       '</div>'+
+       '<button type="button" class="btn" onclick="closePhotoPickerModal()">✕</button>'+
+     '</div>'+
+     '<div class="presets-grid" style="max-height:400px;overflow:auto">'+
+       PRESET_IMAGES.map(function(pi){
+         return '<button type="button" class="preset-card" onclick="selectProductPreset('+id+',\''+pi.path+'\')"><img src="'+esc(pi.path)+'" alt="'+esc(pi.name)+'"><small>'+esc(pi.name)+'</small></button>';
+       }).join('')+
+     '</div>'+
+     '<div class="row" style="margin-top:16px;justify-content:flex-end">'+
+       '<button type="button" class="btn" onclick="closePhotoPickerModal()">Mbyll</button>'+
+     '</div>'+
+   '</div>'+
+ '</div>';
+ document.body.insertAdjacentHTML('beforeend',modalHtml);
+}
+
+function closePhotoPickerModal(){
+ var m=document.getElementById('productPhotoPickerModal');
+ if(m)m.remove();
+}
+
+function selectProductPreset(id,path){
+ var pathInput=document.getElementById('menu-image-path-'+id);
+ var prev=document.getElementById('menu-preview-'+id);
+ if(pathInput)pathInput.value=path;
+ if(prev)prev.src=path;
+ closePhotoPickerModal();
+ toast('Fotoja u zgjodh. Shtyp "Ruaj" te rreshti për ta konfirmuar.');
+}
+
+function openCreateCategoryModal(){
+ var nextOrder=S.adminMenu&&S.adminMenu.categories ? S.adminMenu.categories.length+1 : 1;
+ var modalHtml='<div class="modalBack" id="createCategoryModal">'+
+   '<div class="modal" style="max-width:440px">'+
+     '<div class="row" style="margin-bottom:12px">'+
+       '<div>'+
+         '<h2>Shto kategori të re</h2>'+
+         '<p class="muted">Krijo një kategori të re për produktet e menusë.</p>'+
+       '</div>'+
+       '<button type="button" class="btn" onclick="closeCreateCategoryModal()">✕</button>'+
+     '</div>'+
+     '<form onsubmit="submitCreateCategory(event)">'+
+       '<label for="new-cat-name">Emri i kategorisë *</label>'+
+       '<input id="new-cat-name" required maxlength="50" placeholder="P.sh. Sallata, Mëngjesi, Verëra..." autofocus>'+
+       '<label for="new-cat-order" style="margin-top:10px">Renditja</label>'+
+       '<input id="new-cat-order" type="number" min="0" max="9999" value="'+nextOrder+'">'+
+       '<div id="new-cat-error" style="margin-top:10px"></div>'+
+       '<div class="row modal-actions" style="margin-top:18px;justify-content:flex-end;gap:10px">'+
+         '<button type="button" class="btn" onclick="closeCreateCategoryModal()">Anulo</button>'+
+         '<button type="submit" class="btn primary" id="submit-new-cat-btn">Krijo kategorinë</button>'+
+       '</div>'+
+     '</form>'+
+   '</div>'+
+ '</div>';
+ document.body.insertAdjacentHTML('beforeend',modalHtml);
+}
+
+function closeCreateCategoryModal(){
+ var m=document.getElementById('createCategoryModal');
+ if(m)m.remove();
+}
+
+async function submitCreateCategory(e){
+ e.preventDefault();
+ var name=document.getElementById('new-cat-name').value.trim();
+ var order=Number(document.getElementById('new-cat-order').value);
+ var btn=document.getElementById('submit-new-cat-btn');
+ var errEl=document.getElementById('new-cat-error');
+ if(!name)return toast('Shkruani emrin e kategorisë.');
+ if(btn){btn.disabled=true;btn.textContent='Duke krijuar...';}
+ try{
+   await api('/api/admin/categories',{method:'POST',body:JSON.stringify({name:name,display_order:order})});
+   closeCreateCategoryModal();
+   toast('Kategoria "'+name+'" u krijua me sukses.');
+   await adminMenuTab(document.getElementById('adminContent'));
+ }catch(err){
+   if(btn){btn.disabled=false;btn.textContent='Krijo kategorinë';}
+   if(errEl)errEl.innerHTML='<div class="error">'+esc(err.message)+'</div>';
+   else toast(err.message);
+ }
+}
+
+async function saveMenuProduct(id){
+ var name=document.getElementById('menu-name-'+id).value.trim(),
+     price=Number(document.getElementById('menu-price-'+id).value),
+     category=Number(document.getElementById('menu-category-'+id).value),
+     kindEl=document.getElementById('menu-kind-'+id),
+     kind=kindEl?kindEl.value:null,
+     active=document.getElementById('menu-active-'+id).checked,
+     displayOrder=Number(document.getElementById('menu-order-'+id).value),
+     imagePath=document.getElementById('menu-image-path-'+id).value.trim();
+ if(!name||!Number.isFinite(price)||price<=0)return toast('Shkruani emrin dhe çmimin e vlefshëm.');
+ try{
+   await api('/api/admin/menu/'+id,{
+     method:'PATCH',
+     body:JSON.stringify({name:name,price_cents:Math.round(price*100),category_id:category,kind:kind,active:active,display_order:displayOrder,image_path:imagePath})
+   });
+   toast('Produkti u ruajt.');
+   await adminMenuTab(document.getElementById('adminContent'));
+ }catch(e){toast(e.message)}
+}
+
+async function uploadMenuPhoto(id){
+ var field=document.getElementById('menu-file-'+id),file=field&&field.files&&field.files[0];
+ if(!file)return toast('Zgjidhni një fotografi fillimisht.');
+ if(file.size>3*1024*1024)return toast('Fotografia duhet të jetë maksimumi 3 MB.');
+ try{
+   var dataUrl=await fileDataUrl(file),result=await api('/api/admin/menu-image',{method:'POST',body:JSON.stringify({dataUrl:dataUrl})});
+   document.getElementById('menu-image-path-'+id).value=result.path;
+   document.getElementById('menu-preview-'+id).src=result.path;
+   toast('Fotoja u ngarkua. Shtyp “Ruaj” për ta lidhur me produktin.');
+ }catch(e){toast(e.message)}
 }
 async function adminStockTab(el){
  var products=await api('/api/admin/inventory');S.inventory=products;var low=products.filter(function(p){return p.stock_tracked&&Number(p.stock_quantity)<=Number(p.low_stock_threshold)});

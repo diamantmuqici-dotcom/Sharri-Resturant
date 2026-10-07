@@ -114,6 +114,90 @@ async function main() {
     }),
   });
 
+  // Category creation test
+  const catCreateRes = await request("/api/admin/categories", adminCookie, {
+    method: "POST", body: JSON.stringify({ name: "Sallata Speciale", display_order: 7 }),
+  });
+  const catCreated = await json(catCreateRes);
+  ok(catCreateRes.status === 201 && catCreated.id, "admin can create a new category");
+
+  // Preset restaurant images catalog test
+  const presetsRes = await request("/api/admin/preset-images", adminCookie);
+  const presets = await json(presetsRes);
+  ok(presetsRes.ok && Array.isArray(presets) && presets.length > 20 && presets.some(x => x.path === "/images/burger-sandwich.jpg"),
+    "admin can browse built-in preset restaurant photos");
+
+  // Product creation with name, price, category, kind, photo, and initial stock
+  const createProdRes = await request("/api/admin/menu", adminCookie, {
+    method: "POST", body: JSON.stringify({
+      name: "Sallatë Cezar me Pulë",
+      category_id: catCreated.id,
+      price: "3.50",
+      kind: "USHQIM",
+      image_path: upload.path,
+      display_order: 1,
+      active: true,
+      initial_stock: { track: true, quantity: 25, unit: "porcion", low_stock_threshold: 4 }
+    }),
+  });
+  const createdProd = await json(createProdRes);
+  ok(createProdRes.status === 201 && createdProd.id && createdProd.product.name === "Sallatë Cezar me Pulë" &&
+     createdProd.product.price_cents === 350 && createdProd.product.image_path === upload.path &&
+     createdProd.product.stock_quantity === 25,
+     "admin can create a new product with name, price, category, photo and initial stock");
+
+  // Duplicate name check
+  const dupRes = await request("/api/admin/menu", adminCookie, {
+    method: "POST", body: JSON.stringify({
+      name: "Sallatë Cezar me Pulë", category_id: catCreated.id, price_cents: 350
+    })
+  });
+  ok(dupRes.status === 409, "product creation rejects duplicate active product names");
+
+  // Product is available on waiter menu and public menu
+  const waiterMenuAfter = await json(await request("/api/menu", waiterCookie));
+  const publicMenuAfter = await json(await fetch(BASE + "/api/public-menu"));
+  ok(waiterMenuAfter.products.some(p => p.id === createdProd.id && p.name === "Sallatë Cezar me Pulë"),
+    "newly created product appears on the waiter menu");
+  ok(publicMenuAfter.products.some(p => p.id === createdProd.id && p.name === "Sallatë Cezar me Pulë"),
+    "newly created product appears on the public customer QR menu");
+
+  // Waiter orders the newly created product
+  const newProdOrderRes = await request("/api/porosi", waiterCookie, {
+    method: "POST", body: JSON.stringify({
+      orderType: "TAVOLINE", tableNumber: 46,
+      items: [{ productId: createdProd.id, quantity: 2 }]
+    })
+  });
+  const newProdOrder = await json(newProdOrderRes);
+  ok(newProdOrderRes.ok && newProdOrder.id, "waiter can order the newly created product");
+
+  // Attempt to delete product while active in an order -> must fail with 409
+  const deleteActiveRes = await request("/api/admin/menu/" + createdProd.id, adminCookie, {
+    method: "DELETE"
+  });
+  ok(deleteActiveRes.status === 409, "deleting product in an active order is safely blocked");
+
+  // Pay the order
+  await request("/api/porosi/" + newProdOrder.id + "/pagesa", waiterCookie, {
+    method: "POST", body: JSON.stringify({ method: "CARD" })
+  });
+
+  // Now delete the product -> must succeed
+  const deleteSuccessRes = await request("/api/admin/menu/" + createdProd.id, adminCookie, {
+    method: "DELETE"
+  });
+  ok(deleteSuccessRes.ok, "admin can delete the product once orders are no longer active");
+
+  // Verify removed from menu
+  const menuAfterDel = await json(await request("/api/menu", waiterCookie));
+  ok(!menuAfterDel.products.some(p => p.id === createdProd.id), "deleted product is removed from active menu");
+
+  // Verify historical order still preserves the product snapshot
+  const historicalOrder = await json(await request("/api/historiku/" + newProdOrder.id, adminCookie));
+  ok(historicalOrder.items.some(i => i.product_name_snapshot === "Sallatë Cezar me Pulë" && i.unit_price_cents === 350),
+    "historical order preserves item name and price snapshot after product is deleted");
+
   const qrResponse = await request("/api/admin/menu-qr.svg", adminCookie);
   const qrSvg = await qrResponse.text();
   const forbiddenQr = await request("/api/admin/menu-qr.svg", waiterCookie);
@@ -205,6 +289,8 @@ async function main() {
   ok(appJs.includes("function adminMenuTab(el)") && appJs.includes("function adminStockTab(el)") &&
     appJs.includes("function adminReportsTab(el)") && appJs.includes("function adminQrTab(el)"),
     "admin interface includes menu, inventory, reports and QR controls");
+  ok(appJs.includes("openCreateProductModal") && appJs.includes("askDeleteMenuProduct"),
+    "admin interface includes product creation and deletion dialogs");
   const qrPageJs = fs.readFileSync(path.join(ROOT, "public", "qr-menu.js"), "utf8");
   ok(qrPageJs.includes("/api/public-menu") && fs.existsSync(path.join(ROOT, "public", "menu.html")),
     "mobile public menu page is wired to the public menu API");
